@@ -1,0 +1,4 @@
+Dans toute l'application ajoute des toast en haut à droite qui dure 5s. Le toast doit contenir un code comme succes ou acces refusé. il doit etre un petit card blanc et en bas de cette card une petite ligne qui diminue en fonction du temps qui reste sur quel il s'affiche. cette ligne doit etre de ma meme code couleur si success vert si erreur rouge.
+ensuite dans @page.tsx  dans le chart en donut les code couleurs doivent etre Dimes (bleu) offrande (vert) don (jaune) vente (orange) et autre rouge. Dans cette page meme le bouton Déconnexion doit rediriger vers /connexion.
+Dans@categoriePage.tsx  ajoute des pagination en bas à droite du tableau.
+dans la page@trasactionPage.tsx  integre l'image que je te mets en piece attaché utilise ton savoir faire et ton imagination pour que ça soit vraiment adapté à mon design.
