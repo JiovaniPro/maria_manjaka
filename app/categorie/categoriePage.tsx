@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactElement } from "react";
+import { useToast } from "@/components/ToastContainer";
 
 type Category = {
   id: string;
@@ -72,11 +73,35 @@ const revenueCategories: Category[] = [
     transactions: 8,
     statut: "actif",
   },
+  {
+    id: "6",
+    nom: "Événements Spéciaux",
+    code: "190",
+    type: "120",
+    transactions: 22,
+    statut: "actif",
+  },
+  {
+    id: "7",
+    nom: "Contributions Missions",
+    code: "210",
+    type: "95",
+    transactions: 67,
+    statut: "actif",
+  },
+  {
+    id: "8",
+    nom: "Vente Articles Divers",
+    code: "165",
+    type: "55",
+    transactions: 14,
+    statut: "actif",
+  },
 ];
 
 const expenseCategories: Category[] = [
   {
-    id: "6",
+    id: "9",
     nom: "Loyer",
     code: "300",
     type: "250",
@@ -84,7 +109,7 @@ const expenseCategories: Category[] = [
     statut: "actif",
   },
   {
-    id: "7",
+    id: "10",
     nom: "Salaires",
     code: "310",
     type: "280",
@@ -92,7 +117,7 @@ const expenseCategories: Category[] = [
     statut: "actif",
   },
   {
-    id: "8",
+    id: "11",
     nom: "Électricité",
     code: "320",
     type: "200",
@@ -100,7 +125,7 @@ const expenseCategories: Category[] = [
     statut: "actif",
   },
   {
-    id: "9",
+    id: "12",
     nom: "Entretien",
     code: "330",
     type: "180",
@@ -108,20 +133,47 @@ const expenseCategories: Category[] = [
     statut: "actif",
   },
   {
-    id: "10",
-    nom: "Évènements Caritatifs",
+    id: "13",
+    nom: "Événements Caritatifs",
     code: "340",
     type: "220",
     transactions: 6,
+    statut: "actif",
+  },
+  {
+    id: "14",
+    nom: "Fournitures Bureau",
+    code: "350",
+    type: "150",
+    transactions: 28,
+    statut: "actif",
+  },
+  {
+    id: "15",
+    nom: "Transport",
+    code: "360",
+    type: "170",
+    transactions: 19,
+    statut: "actif",
+  },
+  {
+    id: "16",
+    nom: "Communication",
+    code: "370",
+    type: "130",
+    transactions: 11,
     statut: "actif",
   },
 ];
 
 export default function CategoriesPage() {
   const pathname = usePathname();
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<"revenues" | "depenses">("revenues");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
   const [formData, setFormData] = useState({
     nom: "",
     code: "",
@@ -130,6 +182,9 @@ export default function CategoriesPage() {
   });
 
   const currentCategories = activeTab === "revenues" ? revenueCategories : expenseCategories;
+  const totalPages = Math.ceil(currentCategories.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedCategories = currentCategories.slice(startIndex, startIndex + itemsPerPage);
 
   const handleOpenModal = (category?: Category) => {
     if (category) {
@@ -155,9 +210,21 @@ export default function CategoriesPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Sauvegarde catégorie:", formData);
-    // TODO: Ajouter la logique de sauvegarde
+    if (editingCategory) {
+      showToast("Catégorie modifiée avec succès", "success");
+    } else {
+      showToast("Catégorie créée avec succès", "success");
+    }
     handleCloseModal();
+  };
+
+  const handleDelete = (categoryName: string) => {
+    showToast(`Catégorie "${categoryName}" supprimée`, "error");
+  };
+
+  const handleTabChange = (tab: "revenues" | "depenses") => {
+    setActiveTab(tab);
+    setCurrentPage(1);
   };
 
   return (
@@ -239,7 +306,7 @@ export default function CategoriesPage() {
 
         <div className="mb-6 flex gap-2 border-b border-black/10">
           <button
-            onClick={() => setActiveTab("revenues")}
+            onClick={() => handleTabChange("revenues")}
             className={`border-b-2 px-4 py-3 text-sm font-semibold transition ${
               activeTab === "revenues"
                 ? "border-black text-black"
@@ -249,7 +316,7 @@ export default function CategoriesPage() {
             Catégories de Revenus
           </button>
           <button
-            onClick={() => setActiveTab("depenses")}
+            onClick={() => handleTabChange("depenses")}
             className={`border-b-2 px-4 py-3 text-sm font-semibold transition ${
               activeTab === "depenses"
                 ? "border-black text-black"
@@ -298,7 +365,7 @@ export default function CategoriesPage() {
                 </tr>
               </thead>
               <tbody>
-                {currentCategories.map((category) => (
+                {paginatedCategories.map((category) => (
                   <tr
                     key={category.id}
                     className="border-b border-black/5 transition hover:bg-zinc-50/50"
@@ -333,7 +400,10 @@ export default function CategoriesPage() {
                         >
                           <EditIcon />
                         </button>
-                        <button className="rounded-lg p-2 text-black/60 transition hover:bg-red-50 hover:text-red-600">
+                        <button 
+                          onClick={() => handleDelete(category.nom)}
+                          className="rounded-lg p-2 text-black/60 transition hover:bg-red-50 hover:text-red-600"
+                        >
                           <DeleteIcon />
                         </button>
                       </div>
@@ -342,6 +412,27 @@ export default function CategoriesPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+          
+          {/* Pagination */}
+          <div className="flex items-center justify-end gap-2 border-t border-black/5 px-6 py-4">
+            <span className="text-sm text-black/60">
+              Page {currentPage} sur {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="rounded-lg p-2 text-black/60 transition hover:bg-black/5 disabled:opacity-30 disabled:hover:bg-transparent"
+            >
+              <ChevronLeftIcon />
+            </button>
+            <button
+              onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className="rounded-lg p-2 text-black/60 transition hover:bg-black/5 disabled:opacity-30 disabled:hover:bg-transparent"
+            >
+              <ChevronRightIcon />
+            </button>
           </div>
         </div>
 
@@ -603,3 +694,18 @@ function CloseIcon() {
   );
 }
 
+function ChevronLeftIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function ChevronRightIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}

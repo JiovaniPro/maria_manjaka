@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactElement } from "react";
-import { useToast } from "./ToastContainer";
+import { useToast } from "@/components/ToastContainer";
 
 type Transaction = {
   id: string;
@@ -12,7 +12,7 @@ type Transaction = {
   description: string;
   montant: number;
   montantAffiche?: string;
-  type: "Revenu" | "Répense";
+  type: "Revenu" | "Dépense";
   categorie: string;
   compte: string;
 };
@@ -42,16 +42,16 @@ const transactions: Transaction[] = [
     montant: 1350,
     montantAffiche: "+1.350€",
     type: "Revenu",
-    categorie: "Offranne",
+    categorie: "Offrande",
     compte: "Caisse",
   },
   {
     id: "2",
     date: "18 Oct",
-    description: "Dścription",
+    description: "Description",
     montant: -300,
     montantAffiche: "-300€",
-    type: "Répense",
+    type: "Dépense",
     categorie: "Matériel",
     compte: "Caisse",
   },
@@ -62,26 +62,26 @@ const transactions: Transaction[] = [
     montant: 1350,
     montantAffiche: "+1.350€",
     type: "Revenu",
-    categorie: "Offranne",
+    categorie: "Offrande",
     compte: "Caisse",
   },
   {
     id: "4",
     date: "18 Oct",
-    description: "Achat Fourhiques",
+    description: "Achat Fournitures",
     montant: -1120,
     montantAffiche: "-1120€",
-    type: "Répense",
+    type: "Dépense",
     categorie: "Dîme",
     compte: "Banque A",
   },
   {
     id: "5",
     date: "17 Oct",
-    description: "Achat Fourhimes",
+    description: "Achat Fournitures",
     montant: -120,
     montantAffiche: "-120€",
-    type: "Répense",
+    type: "Dépense",
     categorie: "Dîme",
     compte: "Banque A",
   },
@@ -90,7 +90,7 @@ const transactions: Transaction[] = [
     date: "17 Oct",
     description: "Dîme J. Dupont",
     montant: 250,
-    montantAffiche: "Revenu",
+    montantAffiche: "+250€",
     type: "Revenu",
     categorie: "Dîme",
     compte: "Caisse",
@@ -98,17 +98,17 @@ const transactions: Transaction[] = [
   {
     id: "7",
     date: "18 Oct",
-    description: "Lenne Diea",
+    description: "Location Salle",
     montant: 250,
     montantAffiche: "+250€",
     type: "Revenu",
-    categorie: "Natériel",
+    categorie: "Matériel",
     compte: "Banque A",
   },
   {
     id: "8",
     date: "18 Oct",
-    description: "Dśscription",
+    description: "Description",
     montant: 250,
     montantAffiche: "+250€",
     type: "Revenu",
@@ -148,16 +148,16 @@ export default function TransactionsPage() {
 
   const handleModify = () => {
     if (selectedTransactions.length === 0) {
-      showToast("Veuillez sélectionner au moins une transaction", "error");
+      showToast("Veuillez sélectionner au moins une transaction", "warning");
     } else {
-      showToast("Transaction(s) modifiée(s) avec succès", "success");
+      showToast(`${selectedTransactions.length} transaction(s) modifiée(s) avec succès`, "success");
       setSelectedTransactions([]);
     }
   };
 
   const handleDelete = () => {
     if (selectedTransactions.length === 0) {
-      showToast("Veuillez sélectionner au moins une transaction", "error");
+      showToast("Veuillez sélectionner au moins une transaction", "warning");
     } else {
       showToast(`${selectedTransactions.length} transaction(s) supprimée(s)`, "error");
       setSelectedTransactions([]);
@@ -239,66 +239,73 @@ export default function TransactionsPage() {
       <main className="min-h-screen flex-1 overflow-y-auto px-10 py-10">
         <header className="mb-8">
           <h1 className="text-3xl font-bold">Transactions</h1>
+          <p className="mt-2 text-sm text-black/60">
+            Gérez et suivez toutes vos transactions financières
+          </p>
         </header>
 
-        <div className="mb-6 flex flex-wrap items-center gap-4">
-          <div className="flex flex-1 items-center gap-3 rounded-full border border-black/10 bg-white px-4 py-2">
-            <SearchIcon />
-            <input
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1 bg-transparent text-sm outline-none"
-              placeholder="Filtrer par description..."
-            />
+        {/* Barre de recherche et filtres - Style moderne */}
+        <div className="mb-6 rounded-3xl border border-black/5 bg-white p-6 shadow-[0_15px_45px_rgba(0,0,0,0.05)]">
+          <div className="mb-4 flex flex-wrap items-center gap-4">
+            <div className="flex flex-1 items-center gap-3 rounded-full border border-black/10 bg-zinc-50 px-4 py-2.5">
+              <SearchIcon />
+              <input
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="flex-1 bg-transparent text-sm outline-none placeholder:text-black/40"
+                placeholder="Filtrer par description..."
+              />
+            </div>
+            <button className="flex items-center gap-2 rounded-full border border-blue-500 bg-blue-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-600">
+              <PlusIcon />
+              <span>Ajouter une Transaction</span>
+            </button>
           </div>
-          <button className="flex items-center gap-2 rounded-2xl border border-black/10 bg-white px-4 py-2 text-sm text-black/60 transition hover:bg-black/5">
-            <StarIcon />
-            <span>Transadtins</span>
-          </button>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 rounded-full border border-black/10 bg-zinc-50 px-4 py-2">
+              <MenuIcon />
+              <select
+                value={filterCompte}
+                onChange={(e) => setFilterCompte(e.target.value)}
+                className="bg-transparent text-sm outline-none"
+              >
+                <option value="">Compte</option>
+                <option value="Caisse">Caisse</option>
+                <option value="Banque A">Banque A</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2 rounded-full border border-black/10 bg-zinc-50 px-4 py-2">
+              <TagIcon />
+              <select
+                value={filterCategorie}
+                onChange={(e) => setFilterCategorie(e.target.value)}
+                className="bg-transparent text-sm outline-none"
+              >
+                <option value="">Catégorie</option>
+                <option value="Offrande">Offrande</option>
+                <option value="Dîme">Dîme</option>
+                <option value="Matériel">Matériel</option>
+              </select>
+            </div>
+            <button className="flex items-center gap-2 rounded-full border border-black/10 bg-white px-4 py-2 text-sm text-black/60 transition hover:bg-black/5">
+              <StarIcon />
+              <span>Transactions</span>
+            </button>
+          </div>
         </div>
 
-        <div className="mb-6 flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-2">
-            <MenuIcon />
-            <select
-              value={filterCompte}
-              onChange={(e) => setFilterCompte(e.target.value)}
-              className="rounded-2xl border border-black/10 bg-white px-4 py-2 text-sm outline-none transition focus:border-black"
-            >
-              <option value="">Compte</option>
-              <option value="Caisse">Caisse</option>
-              <option value="Banque A">Banque A</option>
-            </select>
-          </div>
-          <div className="flex items-center gap-2">
-            <UserIcon />
-            <select
-              value={filterCategorie}
-              onChange={(e) => setFilterCategorie(e.target.value)}
-              className="rounded-2xl border border-black/10 bg-white px-4 py-2 text-sm outline-none transition focus:border-black"
-            >
-              <option value="">Catégorie</option>
-              <option value="Offranne">Offranne</option>
-              <option value="Dîme">Dîme</option>
-              <option value="Matériel">Matériel</option>
-              <option value="Natériel">Natériel</option>
-            </select>
-          </div>
-          <div className="flex items-center gap-2">
-            <UserIcon />
-            <select className="rounded-2xl border border-black/10 bg-white px-4 py-2 text-sm outline-none transition focus:border-black">
-              <option>Catégorie</option>
-            </select>
-          </div>
-          <button className="flex items-center gap-2 rounded-2xl bg-blue-500 px-6 py-2 text-sm font-semibold text-white transition hover:bg-blue-600">
-            <PlusIcon />
-            <span>Ajouter une Transaction</span>
-          </button>
-        </div>
-
+        {/* Tableau des transactions - Style moderne */}
         <div className="rounded-3xl border border-black/5 bg-white shadow-[0_15px_45px_rgba(0,0,0,0.05)]">
           <div className="border-b border-black/5 p-6">
-            <h2 className="text-lg font-semibold">Liste des Transactions</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Liste des Transactions</h2>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-black/60">
+                  {selectedTransactions.length > 0 && `${selectedTransactions.length} sélectionnée(s)`}
+                </span>
+              </div>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -307,9 +314,9 @@ export default function TransactionsPage() {
                   <th className="px-6 py-4 text-left">
                     <input
                       type="checkbox"
-                      checked={selectedTransactions.length === paginatedTransactions.length}
+                      checked={selectedTransactions.length === paginatedTransactions.length && paginatedTransactions.length > 0}
                       onChange={toggleAll}
-                      className="h-4 w-4 rounded border-black/20"
+                      className="h-4 w-4 rounded border-black/20 text-blue-500 focus:ring-2 focus:ring-blue-500"
                     />
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.1em] text-black/60">
@@ -343,7 +350,7 @@ export default function TransactionsPage() {
                         type="checkbox"
                         checked={selectedTransactions.includes(transaction.id)}
                         onChange={() => toggleTransaction(transaction.id)}
-                        className="h-4 w-4 rounded border-black/20"
+                        className="h-4 w-4 rounded border-black/20 text-blue-500 focus:ring-2 focus:ring-blue-500"
                       />
                     </td>
                     <td className="px-6 py-4 text-sm text-black/60">{transaction.date}</td>
@@ -359,10 +366,17 @@ export default function TransactionsPage() {
                     </td>
                     <td className="px-6 py-4">
                       <span
-                        className={`text-sm ${
-                          transaction.type === "Revenu" ? "text-emerald-600" : "text-red-600"
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                          transaction.type === "Revenu" 
+                            ? "bg-emerald-50 text-emerald-700" 
+                            : "bg-red-50 text-red-700"
                         }`}
                       >
+                        {transaction.type === "Revenu" ? (
+                          <ArrowUpIcon />
+                        ) : (
+                          <ArrowDownIcon />
+                        )}
                         {transaction.type}
                       </span>
                     </td>
@@ -375,53 +389,50 @@ export default function TransactionsPage() {
           </div>
         </div>
 
+        {/* Actions et pagination - Style moderne */}
         <div className="mt-6 rounded-3xl border border-black/5 bg-white p-6 shadow-[0_15px_45px_rgba(0,0,0,0.05)]">
-          <h3 className="mb-4 text-lg font-semibold">Liste des Transactions</h3>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="action"
-                id="modifier"
-                className="h-4 w-4"
-              />
-              <label htmlFor="modifier" className="text-sm">
-                Actions Moditir
-              </label>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-semibold text-black/70">Actions :</span>
+              <button 
+                onClick={handleModify}
+                className="flex items-center gap-2 rounded-2xl bg-blue-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-600 disabled:opacity-50"
+                disabled={selectedTransactions.length === 0}
+              >
+                <EditIcon />
+                <span>Modifier</span>
+              </button>
+              <button 
+                onClick={handleDelete}
+                className="flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-5 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-100 disabled:opacity-50"
+                disabled={selectedTransactions.length === 0}
+              >
+                <TrashIcon />
+                <span>Supprimer</span>
+              </button>
             </div>
-            <button 
-              onClick={handleModify}
-              className="flex items-center gap-2 rounded-2xl bg-blue-500 px-6 py-2 text-sm font-semibold text-white transition hover:bg-blue-600"
-            >
-              <EditIcon />
-              <span>Modiiner</span>
-            </button>
-            <button 
-              onClick={handleDelete}
-              className="flex items-center gap-2 rounded-2xl border border-black/10 bg-white px-6 py-2 text-sm font-semibold text-black transition hover:bg-red-50 hover:text-red-600"
-            >
-              <TrashIcon />
-              <span>Supprerer</span>
-            </button>
-            <div className="ml-auto flex items-center gap-2">
-              <button className="rounded-lg border border-black/10 p-2 transition hover:bg-black/5">
+            <div className="flex items-center gap-3">
+              <button className="rounded-xl border border-black/10 p-2.5 transition hover:bg-black/5">
                 <GridIcon />
               </button>
-              <button className="rounded-lg border border-black/10 p-2 transition hover:bg-black/5">
+              <button className="rounded-xl border border-black/10 p-2.5 transition hover:bg-black/5">
                 <ListIcon />
               </button>
+              <div className="mx-2 h-6 w-px bg-black/10" />
               <button
                 onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
-                className="rounded-lg p-2 text-black/60 transition hover:bg-black/5 disabled:opacity-30"
+                className="rounded-xl border border-black/10 p-2.5 text-black/60 transition hover:bg-black/5 disabled:opacity-30 disabled:hover:bg-transparent"
               >
                 <ChevronLeftIcon />
               </button>
-              <span className="text-sm text-black/60">{currentPage}</span>
+              <span className="min-w-[80px] text-center text-sm font-medium text-black/70">
+                Page {currentPage} / {totalPages}
+              </span>
               <button
                 onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
                 disabled={currentPage === totalPages}
-                className="rounded-lg p-2 text-black/60 transition hover:bg-black/5 disabled:opacity-30"
+                className="rounded-xl border border-black/10 p-2.5 text-black/60 transition hover:bg-black/5 disabled:opacity-30 disabled:hover:bg-transparent"
               >
                 <ChevronRightIcon />
               </button>
@@ -538,16 +549,17 @@ function StarIcon() {
 
 function MenuIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
+    <svg viewBox="0 0 24 24" className="h-4 w-4 text-black/60" fill="currentColor">
       <path d="M3 6h18v2H3zM3 11h18v2H3zM3 16h18v2H3z" />
     </svg>
   );
 }
 
-function UserIcon() {
+function TagIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
-      <path d="M12 12a5 5 0 100-10 5 5 0 000 10zm-7 9v-1a5 5 0 015-5h4a5 5 0 015 5v1z" />
+    <svg viewBox="0 0 24 24" className="h-4 w-4 text-black/60" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z" />
+      <circle cx="7" cy="7" r="1" fill="currentColor" />
     </svg>
   );
 }
@@ -579,7 +591,7 @@ function TrashIcon() {
 
 function GridIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
+    <svg viewBox="0 0 24 24" className="h-5 w-5 text-black/60" fill="currentColor">
       <path d="M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z" />
     </svg>
   );
@@ -587,7 +599,7 @@ function GridIcon() {
 
 function ListIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
+    <svg viewBox="0 0 24 24" className="h-5 w-5 text-black/60" fill="currentColor">
       <path d="M3 6h18v2H3zM3 11h18v2H3zM3 16h18v2H3z" />
     </svg>
   );
@@ -605,6 +617,22 @@ function ChevronRightIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
       <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function ArrowUpIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="3">
+      <path d="M12 19V5m0 0l-7 7m7-7l7 7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function ArrowDownIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="3">
+      <path d="M12 5v14m0 0l7-7m-7 7l-7-7" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

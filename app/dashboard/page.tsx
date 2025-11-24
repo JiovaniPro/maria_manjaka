@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { ReactElement } from "react";
+import { useToast } from "@/components/ToastContainer";
 
 type NavItem = { label: string; icon: () => ReactElement; href: string };
 type PreferenceItem = { label: string; icon: () => ReactElement };
@@ -21,12 +22,12 @@ const navItems: NavItem[] = [
   { label: "Catégories", icon: CategoriesIcon, href: "/categorie" },
   { label: "Rapports", icon: ReportsIcon, href: "/rapports" },
   { label: "Utilisateurs", icon: UsersIcon, href: "/utilisateurs" },
-] ;
+];
 
 const preferenceItems: PreferenceItem[] = [
   { label: "Paramètres", icon: SettingsIcon },
   { label: "Aide", icon: HelpIcon },
-] ;
+];
 
 const financialCards: FinancialCard[] = [
   {
@@ -53,14 +54,15 @@ const financialCards: FinancialCard[] = [
     variation: "+18%",
     trend: "up",
   },
-] ;
+];
 
 const revenueBreakdown: { label: string; value: number; color: string }[] = [
-  { label: "Dîmes", value: 45, color: "#16a34a" },
-  { label: "Dons", value: 30, color: "#4ade80" },
-  { label: "Ventes", value: 15, color: "#ef4444" },
-  { label: "Autres", value: 10, color: "#f87171" },
-] ;
+  { label: "Dîmes", value: 45, color: "#3b82f6" },
+  { label: "Offrandes", value: 30, color: "#16a34a" },
+  { label: "Dons", value: 15, color: "#eab308" },
+  { label: "Ventes", value: 7, color: "#f97316" },
+  { label: "Autres", value: 3, color: "#ef4444" },
+];
 
 const transactions = [
   { date: "15 Jan", description: "Offrande spéciale", montant: "+$2.450" },
@@ -76,6 +78,16 @@ const accounts = [
 
 export default function DashboardPage() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { showToast } = useToast();
+
+  const handleLogout = () => {
+    showToast("Déconnexion réussie", "success");
+    setTimeout(() => {
+      router.push("/connexion");
+    }, 1000);
+  };
+
   return (
     <div className="flex min-h-screen bg-zinc-50 font-sans text-black">
       <aside className="sticky top-0 flex h-screen w-72 flex-col justify-between bg-black px-6 py-8 text-white">
@@ -126,7 +138,10 @@ export default function DashboardPage() {
               </li>
             ))}
           </ul>
-          <button className="flex w-full items-center gap-3 rounded-2xl border border-white/20 px-3 py-2 text-sm text-white transition hover:bg-white hover:text-black">
+          <button 
+            onClick={handleLogout}
+            className="flex w-full items-center gap-3 rounded-2xl border border-white/20 px-3 py-2 text-sm text-white transition hover:bg-white hover:text-black"
+          >
             <LogoutIcon />
             <span>Déconnexion</span>
           </button>
@@ -268,6 +283,7 @@ export default function DashboardPage() {
   );
 }
 
+// Icons (tous les icons restent identiques)
 function DashboardIcon() {
   return (
     <svg
@@ -472,5 +488,3 @@ function IconChurch() {
     </svg>
   );
 }
-
-
