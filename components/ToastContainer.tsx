@@ -52,6 +52,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         ))}
       </div>
     </ToastContext.Provider>
+    
   );
 }
 
@@ -134,6 +135,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
           className={`h-full transition-all duration-50 ease-linear ${color.bar}`}
           style={{ width: `${progress}%` }}
         />
+        
       </div>
     </div>
   );

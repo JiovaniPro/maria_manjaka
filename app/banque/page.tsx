@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactElement } from "react";
@@ -28,20 +29,21 @@ type NavItem = { label: string; icon: () => ReactElement; href: string };
 
 // Données Mockées (Simulées)
 let bankData: BankTransaction[] = [
-  { id: "1", date: "2024-11-10", description: "Paiement Loyer Décembre", montant: 1200, type: "Retrait", numeroCheque: "CHQ-88541" },
+  { id: "1", date: "2024-11-10", description: "Paiement Loyer Décembre", montant: -1200, type: "Retrait", numeroCheque: "CHQ-88541" },
   { id: "2", date: "2024-11-12", description: "Virement Dîmes Semaine 45", montant: 4500, type: "Dépôt" },
-  { id: "3", date: "2024-11-15", description: "Achat Matériel Sonorisation", montant: 850, type: "Retrait", numeroCheque: "CHQ-88542" },
+  { id: "3", date: "2024-11-15", description: "Achat Matériel Sonorisation", montant: -850, type: "Retrait", numeroCheque: "CHQ-88542" },
   { id: "4", date: "2024-11-20", description: "Donateur Anonyme", montant: 2000, type: "Dépôt" },
-  { id: "5", date: "2024-11-25", description: "Facture Electricité (Jirama)", montant: 320, type: "Retrait", numeroCheque: "CHQ-88543" },
-  { id: "6", date: "2024-10-01", description: "Retrait Espèces pour Caisse", montant: 500, type: "Retrait", numeroCheque: "CHQ-88544" },
+  { id: "5", date: "2024-11-25", description: "Facture Electricité (Jirama)", montant: -320, type: "Retrait", numeroCheque: "CHQ-88543" },
+  { id: "6", date: "2024-10-01", description: "Retrait Espèces pour Caisse", montant: -500, type: "Retrait", numeroCheque: "CHQ-88544" },
   { id: "7", date: "2024-10-05", description: "Offrandes du Culte du 05/10", montant: 1500, type: "Dépôt" },
-  { id: "8", date: "2024-10-18", description: "Paiement Fournitures Bureau", montant: 150, type: "Retrait", numeroCheque: "CHQ-88545" },
+  { id: "8", date: "2024-10-18", description: "Paiement Fournitures Bureau", montant: -150, type: "Retrait", numeroCheque: "CHQ-88545" },
   { id: "9", date: "2024-09-02", description: "Transfert Dîmes Début Sept", montant: 3000, type: "Dépôt" },
-  { id: "10", date: "2024-09-15", description: "Frais Bancaires Mensuels", montant: 15, type: "Retrait", numeroCheque: "CHQ-88546" },
+  { id: "10", date: "2024-09-15", description: "Frais Bancaires Mensuels", montant: -15, type: "Retrait", numeroCheque: "CHQ-88546" },
   { id: "11", date: "2024-09-28", description: "Don exceptionnel", montant: 1000, type: "Dépôt" },
 ];
 
-const soldeBanqueActuel = 15420; // Solde fictif
+// Calcul du solde actuel (somme des montants)
+const soldeBanqueActuel = bankData.reduce((acc, curr) => acc + curr.montant, 0); 
 
 const months = [
     { value: "", label: "Tous les mois" },
@@ -53,11 +55,8 @@ const months = [
 const years = ["", "2024", "2023", "2022"];
 
 // ====================================================================
-// ICON COMPONENTS (Style Dashboard "Fill")
-// ... (Les icônes DashboardIcon, TransactionsIcon, AccountsIcon, etc. sont supposées être ici)
-// Je les ai laissées dans la version précédente pour la concision, 
-// mais elles sont incluses dans la version finale pour un code complet.
-// J'inclus juste les nouvelles/utiles pour l'exemple.
+// ICON COMPONENTS
+// (Réutilisées pour la concision)
 // ====================================================================
 
 function DashboardIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" stroke="none"><path d="M4 3h7v9H4zM13 3h7v5h-7zM13 10h7v11h-7zM4 14h7v7H4z" /></svg>; }
@@ -65,25 +64,33 @@ function TransactionsIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5
 function AccountsIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor"><path d="M4 4h16v6H4zM4 14h16v6H4z" /></svg>; }
 function CategoriesIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor"><path d="M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z" /></svg>; }
 function ReportsIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor"><path d="M5 3h4l2 3h8v15H5z" /></svg>; }
-function UsersIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor"><path d="M12 12a5 5 0 100-10 5 5 0 000 10zm-7 9v-1a5 5 0 015-5h4a5 5 0 015 5v1z" /></svg>; }
-function SettingsIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor"><path d="M12 15a3 3 0 110-6 3 3 0 010 6zm8.6-3.5l1.4 2.5-2.1 3.6-2.9-.3a7.1 7.1 0 01-1.6 1l-.5 2.8H9.1l-.5-2.8a7.1 7.1 0 01-1.6-1l-2.9.3-2.1-3.6 1.4-2.5a7.6 7.6 0 010-1l-1.4-2.5L4.1 4.4l2.9.3a7.1 7.1 0 011.6-1L9.1 1h5.8l.5 2.8a7.1 7.1 0 011.6 1l2.9-.3 2.1 3.6-1.4 2.5a7.6 7.6 0 010 1z"/></svg>; }
-function HelpIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 15h-1v-2h2v2zm1.1-4.4l-.6.4V14h-1v-2l1-.7a1.6 1.6 0 10-2.5-1.3H8.9A3.1 3.1 0 1113.1 12z" /></svg>; }
+function UsersIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor"><path d="M12 12a5 5 0 100-10 5 5 0 000 10zm-7 9v-1a5 5 0 015-5h4a5 5 0 015 5v1z" /></svg>; } 
 function LogoutIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor"><path d="M10 3h10v18H10v-2h8V5h-8zm-1 6l-4 3 4 3v-2h7v-2H9z" /></svg>; }
 
 // Icons Utilitaires
 function IconChurch() { return <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3L2 12h3v8z" /></svg>; }
 function SearchIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5 text-black/40" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /></svg>; }
 function PlusIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>; }
-function EditIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5 text-black/60" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" /></svg>; }
+function EditIcon() {
+    return (
+      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+        <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+      </svg>
+    );
+  }
+// function EditIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5 text-black/60" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" /></svg>; }
 function CloseIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>; }
 function BankIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 21h18M5 21v-7l8-5 8 5v7M6 10l6-4 6 4" /></svg>; }
-function ArrowDownRightIcon() { return <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M7 7l10 10M17 7v10H7" /></svg>; } // Pour Retrait
-function ArrowUpRightIcon() { return <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M7 17L17 7M7 7h10v10" /></svg>; } // Pour Depot
+function ArrowDownRightIcon() { return <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M7 7l10 10M17 7v10H7" /></svg>; }
+function ArrowUpRightIcon() { return <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M7 17L17 7M7 7h10v10" /></svg>; }
 function CheckIcon() { return <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /></svg>; }
 function CalendarIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5 text-black/60" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>; }
 function RefreshIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 0 0-9-9c-1.88 0-3.66.6-5.05 1.7L3 6M21 12h-4M3 12h4M6 18l-3-3h6l3 3m-9 0v-4" /></svg>; }
 function ChevronLeftIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>; }
 function ChevronRightIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>; }
+function EyeIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2z" /></svg>; }
+function EyeOffIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.9 9.9 0 0 1 12 4c7 0 11 8 11 8a18.45 18.45 0 0 1-5.06 5.94M4.24 4.24l15.52 15.52M12 12l.01.01" /></svg>; }
 
 const navItems: NavItem[] = [
   { label: "Dashboard", icon: DashboardIcon, href: "/dashboard" },
@@ -104,20 +111,36 @@ function SecureSoldeCard({ soldeActuel, showToast }: { soldeActuel: number, show
     const [soldeAuthPassword, setSoldeAuthPassword] = useState("");
     const timeoutRef = useRef<NodeJS.Timeout>();
 
+    const clearSoldeTimeout = useCallback(() => {
+        if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = undefined;
+        }
+    }, []);
+
     // Gère le timeout de 30 secondes
     useEffect(() => {
         if (showSolde) {
-            if (timeoutRef.current) clearTimeout(timeoutRef.current);
+            clearSoldeTimeout(); // Clear any existing timeout
             timeoutRef.current = setTimeout(() => {
                 setShowSolde(false);
                 showToast("Solde masqué par mesure de sécurité.", "warning");
             }, 30000); // 30 secondes
 
-            return () => {
-                if (timeoutRef.current) clearTimeout(timeoutRef.current);
-            };
+            return () => clearSoldeTimeout();
         }
-    }, [showSolde, showToast]);
+    }, [showSolde, showToast, clearSoldeTimeout]);
+
+    const handleToggleVisibility = () => {
+        if (showSolde) {
+            // L'utilisateur masque manuellement
+            setShowSolde(false);
+            clearSoldeTimeout(); // Effacer immédiatement le timer
+        } else {
+            // L'utilisateur tente de déverrouiller
+            setSoldeAuthModalOpen(true);
+        }
+    };
 
     const handleSoldeAuth = (e: React.FormEvent) => {
         e.preventDefault();
@@ -132,28 +155,26 @@ function SecureSoldeCard({ soldeActuel, showToast }: { soldeActuel: number, show
         }
     };
 
-    const handleCardClick = () => {
-        if (!showSolde) {
-            setSoldeAuthModalOpen(true);
-        }
-    };
-
     return (
         <>
             {/* Carte Solde Rapide */}
-            <div 
-                onClick={handleCardClick}
-                className="flex cursor-pointer items-center gap-4 rounded-3xl border border-black/5 bg-white px-6 py-4 shadow-sm transition hover:shadow-md"
-            >
+            <div className="flex items-center gap-4 rounded-3xl border border-black/5 bg-white px-6 py-4 shadow-sm">
                 <div className="rounded-full bg-blue-50 p-3 text-blue-600">
                     <BankIcon />
                 </div>
                 <div>
                     <p className="text-xs uppercase tracking-wider text-black/40">Solde Banque</p>
                     <p className={`text-xl font-bold transition-all duration-300 ${showSolde ? 'text-black' : 'text-zinc-400'}`}>
-                        {showSolde ? `${soldeActuel.toLocaleString()} €` : '****'}
+                        {showSolde ? `${soldeActuel.toLocaleString('fr-FR')} €` : '****'}
                     </p>
                 </div>
+                <button 
+                    onClick={handleToggleVisibility}
+                    className="rounded-full p-2 text-black/40 transition hover:bg-zinc-100 hover:text-blue-500"
+                    title={showSolde ? "Masquer le solde" : "Afficher le solde"}
+                >
+                    {showSolde ? <EyeOffIcon /> : <EyeIcon />}
+                </button>
             </div>
 
             {/* Modal d'Autorisation du Solde */}
@@ -183,198 +204,47 @@ function SecureSoldeCard({ soldeActuel, showToast }: { soldeActuel: number, show
     );
 }
 
-
 // ====================================================================
-// MAIN COMPONENT
+// TOTAL FILTER CARD COMPONENT
 // ====================================================================
 
-export default function BanquePage() {
-  const pathname = usePathname();
-  const router = useRouter();
-  const { showToast } = useToast();
-  const isLoading = useLoading(1000);
+function TotalFilterCard({ total, activeTab }: { total: number, activeTab: "retrait" | "depot" }) {
+    const isRetrait = activeTab === "retrait";
+    const displayTotal = Math.abs(total);
 
-  // States
-  const [activeTab, setActiveTab] = useState<"retrait" | "depot">("retrait");
-  const [dataVersion, setDataVersion] = useState(0); // Trigger refresh
-  const [currentPage, setCurrentPage] = useState(1);
-  
-  // Filter States
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterMonth, setFilterMonth] = useState("");
-  const [filterYear, setFilterYear] = useState("");
-  
-  // Security & Modals
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [authPassword, setAuthPassword] = useState("");
-  const [isModifyModalOpen, setIsModifyModalOpen] = useState(false);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<BankTransaction | null>(null);
+    const cardClass = isRetrait
+        ? "bg-red-50 text-red-700 border-red-200"
+        : "bg-emerald-50 text-emerald-700 border-emerald-200";
 
-  // Form State (Initialisation propre pour éviter le bug de n° chèque)
-  const initialFormData: Partial<BankTransaction> = {
-    date: new Date().toISOString().substring(0, 10),
-    description: "",
-    montant: 0,
-    numeroCheque: "",
-    type: activeTab === "retrait" ? "Retrait" : "Dépôt"
-  };
-  const [formData, setFormData] = useState<Partial<BankTransaction>>(initialFormData);
+    const title = isRetrait ? "Total Retraits Filtrés" : "Total Dépôts Filtrés";
 
-  // --- Handlers ---
-
-  const handleLogout = () => {
-    showToast("Déconnexion réussie", "success");
-    router.push("/connexion");
-  };
-
-  const handleResetFilters = () => {
-    setSearchTerm("");
-    setFilterMonth("");
-    setFilterYear("");
-    setCurrentPage(1);
-  };
-  
-  const handleOpenAddModal = () => {
-    // Correction du bug : Réinitialisation complète du formData avec le type d'onglet actuel
-    const type = activeTab === "retrait" ? "Retrait" : "Dépôt";
-    setFormData({
-        date: new Date().toISOString().substring(0, 10),
-        description: "",
-        montant: 0,
-        numeroCheque: "",
-        type: type
-    });
-    setIsAddModalOpen(true);
-  };
-
-  // --- Logic for Modification ---
-  const startModify = (item: BankTransaction) => {
-    setSelectedItem(item);
-    setAuthPassword("");
-    setIsAuthModalOpen(true);
-  };
-
-  const verifyPassword = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (authPassword === SECRET_PASSWORD) {
-      setIsAuthModalOpen(false);
-      // Charger le formulaire avec les données de la transaction à modifier
-      setFormData({ 
-        ...selectedItem, 
-        // Assurer que le montant est positif pour le formulaire
-        montant: Math.abs(selectedItem?.montant || 0),
-        // Assurer le type pour le rendu du modal
-        type: selectedItem?.type 
-      } as Partial<BankTransaction>); 
-      setIsModifyModalOpen(true);
-      showToast("Accès autorisé", "success");
-    } else {
-      showToast("Code incorrect", "error");
-    }
-  };
-
-  const handleSaveModification = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const isRetrait = formData.type === "Retrait";
-    if (isRetrait && !formData.numeroCheque) {
-        showToast("Le N° Chèque est obligatoire pour un Retrait.", "warning");
-        return;
-    }
-
-    const index = bankData.findIndex(d => d.id === formData.id);
-    if(index !== -1 && formData.id) {
-        bankData[index] = { 
-            ...bankData[index], 
-            ...formData as BankTransaction,
-            montant: isRetrait ? -(Number(formData.montant) || 0) : (Number(formData.montant) || 0), // Assurer le signe pour le mock data
-            type: formData.type || bankData[index].type // Assurer le type
-        };
-        showToast("Modification enregistrée", "success");
-        setIsModifyModalOpen(false);
-        setDataVersion(v => v + 1);
-        setCurrentPage(1);
-    }
-  };
-
-  const handleAddItem = (e: React.FormEvent) => {
-      e.preventDefault();
-      const type = activeTab === "retrait" ? "Retrait" : "Dépôt";
-      const montant = Number(formData.montant);
-
-      if (type === "Retrait" && !formData.numeroCheque) {
-        showToast("Le N° Chèque est obligatoire pour un Retrait.", "warning");
-        return;
-      }
-      if (montant <= 0) {
-        showToast("Le montant doit être supérieur à zéro.", "warning");
-        return;
-      }
-
-      const newTransaction: BankTransaction = {
-          id: Date.now().toString(),
-          date: formData.date || new Date().toISOString().substring(0, 10),
-          description: formData.description || "Nouvelle transaction",
-          montant: type === "Retrait" ? -montant : montant,
-          type: type,
-          numeroCheque: type === "Retrait" ? formData.numeroCheque : undefined
-      };
-      bankData.unshift(newTransaction); // Ajouter au début pour l'affichage
-      showToast(`${type} ajouté avec succès.`, "success");
-      setIsAddModalOpen(false);
-      setDataVersion(v => v + 1);
-      setCurrentPage(1);
-      // formData est réinitialisé via handleOpenAddModal lors de la prochaine ouverture
-  };
-
-  // Filter Data based on Tab, Filters, and Search
-  const filteredData = useMemo(() => {
-    const v = dataVersion; // Dependency
-    let data = bankData.filter(d => 
-        activeTab === "retrait" ? d.type === "Retrait" : d.type === "Dépôt"
+    return (
+        <div className={`flex flex-col rounded-3xl border-2 p-5 shadow-sm min-w-[200px] ${cardClass}`}>
+            <p className="text-xs uppercase tracking-wider opacity-80">{title}</p>
+            <p className="text-2xl font-bold mt-1">
+                {displayTotal.toLocaleString('fr-FR')} €
+            </p>
+        </div>
     );
+}
+
+// ====================================================================
+// MODAL FORM (Déplacé ici pour éviter le problème de focus)
+// ====================================================================
+
+interface ModalFormProps {
+    title: string;
+    onSubmit: (e: React.FormEvent) => void;
+    onClose: () => void;
+    formData: Partial<BankTransaction>;
+    setFormData: React.Dispatch<React.SetStateAction<Partial<BankTransaction>>>;
+    isRetrait: boolean;
+    isModification: boolean;
+}
+
+const ModalForm: React.FC<ModalFormProps> = ({ title, onSubmit, onClose, formData, setFormData, isRetrait, isModification }) => {
     
-    // 1. Filter by Date
-    data = data.filter(t => {
-        const transactionDate = new Date(t.date);
-        const matchMonth = filterMonth === "" || (transactionDate.getMonth() + 1).toString() === filterMonth;
-        const matchYear = filterYear === "" || transactionDate.getFullYear().toString() === filterYear;
-        return matchMonth && matchYear;
-    });
-
-    // 2. Filter by Search Term
-    if (searchTerm) {
-        const term = searchTerm.toLowerCase();
-        data = data.filter(t => 
-            t.description.toLowerCase().includes(term) || 
-            (t.numeroCheque && t.numeroCheque.toLowerCase().includes(term))
-        );
-    }
-
-    // Triez par date par défaut (la plus récente d'abord)
-    data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    
-    return data;
-  }, [activeTab, dataVersion, searchTerm, filterMonth, filterYear]);
-
-  // Pagination Logic
-  const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedData = filteredData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-
-  // --- Render Helpers ---
-
-  const ModalForm = ({ title, onSubmit, onClose, isModification = false }: { 
-    title: string, 
-    onSubmit: (e: React.FormEvent) => void, 
-    onClose: () => void,
-    isModification?: boolean
-  }) => {
-    // Déterminer si le champ N° Chèque doit être affiché
-    // Si c'est un ajout, on utilise l'activeTab
-    // Si c'est une modification, on utilise le type dans le formData
-    const shouldShowCheque = isModification ? formData.type === "Retrait" : activeTab === "retrait";
+    const shouldShowCheque = isModification ? formData.type === "Retrait" : isRetrait;
       
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -389,7 +259,6 @@ export default function BanquePage() {
                     <button onClick={onClose} className="rounded-lg p-2 text-black/40 transition hover:bg-black/5 hover:text-black"><CloseIcon /></button>
                 </div>
                 <form onSubmit={onSubmit} className="space-y-4">
-                    {/* Le type est fixé par l'onglet si c'est un ajout, ou par le selectedItem si c'est une modif */}
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="mb-1 block text-sm font-semibold">Date</label>
@@ -397,7 +266,7 @@ export default function BanquePage() {
                         </div>
                         <div>
                             <label className="mb-1 block text-sm font-semibold">Montant (€)</label>
-                            <input type="number" name="montant" required min="0.01" step="0.01" value={formData.montant || 0} onChange={handleInputChange} className="w-full rounded-xl border border-black/10 bg-zinc-50 p-3 text-sm" />
+                            <input type="number" name="montant" required min="0.01" step="0.01" value={formData.montant || ""} onChange={handleInputChange} className="w-full rounded-xl border border-black/10 bg-zinc-50 p-3 text-sm" />
                         </div>
                     </div>
                     
@@ -406,7 +275,7 @@ export default function BanquePage() {
                         <input type="text" name="description" required value={formData.description || ""} onChange={handleInputChange} className="w-full rounded-xl border border-black/10 bg-zinc-50 p-3 text-sm" placeholder="Ex: Paiement facture..." />
                     </div>
                     
-                    {/* Champ Spécifique Retrait (Correction du bug) */}
+                    {/* Champ Spécifique Retrait */}
                     {shouldShowCheque && (
                         <div>
                             <label className="mb-1 block text-sm font-semibold text-red-600">
@@ -437,9 +306,192 @@ export default function BanquePage() {
   };
 
 
+// ====================================================================
+// MAIN COMPONENT
+// ====================================================================
+
+export default function BanquePage() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const { showToast } = useToast();
+  const isLoading = useLoading(1000);
+
+  // States
+  const [activeTab, setActiveTab] = useState<"retrait" | "depot">("retrait");
+  const [dataVersion, setDataVersion] = useState(0); // Trigger refresh
+  const [currentPage, setCurrentPage] = useState(1);
+  
+  // Filter States
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterMonth, setFilterMonth] = useState("");
+  const [filterYear, setFilterYear] = useState("");
+  
+  // Security & Modals
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authPassword, setAuthPassword] = useState("");
+  const [isModifyModalOpen, setIsModifyModalOpen] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<BankTransaction | null>(null);
+
+  // Form State
+  const initialFormData: Partial<BankTransaction> = {
+    date: new Date().toISOString().substring(0, 10),
+    description: "",
+    montant: 0,
+    numeroCheque: "",
+    type: "Retrait" // Temporaire, sera mis à jour
+  };
+  const [formData, setFormData] = useState<Partial<BankTransaction>>(initialFormData);
+
+  // --- Handlers ---
+
+  const handleLogout = () => {
+    showToast("Déconnexion réussie", "success");
+    router.push("/connexion");
+  };
+
+  const handleResetFilters = () => {
+    setSearchTerm("");
+    setFilterMonth("");
+    setFilterYear("");
+    setCurrentPage(1);
+  };
+  
+  const handleOpenAddModal = () => {
+    const type = activeTab === "retrait" ? "Retrait" : "Dépôt";
+    setFormData({
+        date: new Date().toISOString().substring(0, 10),
+        description: "",
+        montant: 0,
+        numeroCheque: "",
+        type: type
+    });
+    setIsAddModalOpen(true);
+  };
+
+  // --- Logic for Modification ---
+  const startModify = (item: BankTransaction) => {
+    setSelectedItem(item);
+    setAuthPassword("");
+    setIsAuthModalOpen(true);
+  };
+
+  const verifyPassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (authPassword === SECRET_PASSWORD) {
+      setIsAuthModalOpen(false);
+      setFormData({ 
+        ...selectedItem, 
+        montant: Math.abs(selectedItem?.montant || 0),
+        type: selectedItem?.type 
+      } as Partial<BankTransaction>); 
+      setIsModifyModalOpen(true);
+      showToast("Accès autorisé", "success");
+    } else {
+      showToast("Code incorrect", "error");
+    }
+  };
+
+  const handleSaveModification = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const isRetrait = formData.type === "Retrait";
+    if (isRetrait && !formData.numeroCheque) {
+        showToast("Le N° Chèque est obligatoire pour un Retrait.", "warning");
+        return;
+    }
+
+    const index = bankData.findIndex(d => d.id === formData.id);
+    if(index !== -1 && formData.id) {
+        bankData[index] = { 
+            ...bankData[index], 
+            ...formData as BankTransaction,
+            montant: isRetrait ? -(Number(formData.montant) || 0) : (Number(formData.montant) || 0), // Assurer le signe
+            type: formData.type || bankData[index].type 
+        };
+        showToast("Modification enregistrée", "success");
+        setIsModifyModalOpen(false);
+        setDataVersion(v => v + 1);
+        setCurrentPage(1);
+    }
+  };
+
+  const handleAddItem = (e: React.FormEvent) => {
+      e.preventDefault();
+      const type = formData.type || activeTab === "retrait" ? "Retrait" : "Dépôt";
+      const montant = Number(formData.montant);
+
+      if (type === "Retrait" && !formData.numeroCheque) {
+        showToast("Le N° Chèque est obligatoire pour un Retrait.", "warning");
+        return;
+      }
+      if (montant <= 0) {
+        showToast("Le montant doit être supérieur à zéro.", "warning");
+        return;
+      }
+
+      const newTransaction: BankTransaction = {
+          id: Date.now().toString(),
+          date: formData.date || new Date().toISOString().substring(0, 10),
+          description: formData.description || "Nouvelle transaction",
+          montant: type === "Retrait" ? -montant : montant, // Stocker le montant avec le signe
+          type: type,
+          numeroCheque: type === "Retrait" ? formData.numeroCheque : undefined
+      };
+      bankData.unshift(newTransaction); 
+      showToast(`${type} ajouté avec succès.`, "success");
+      setIsAddModalOpen(false);
+      setDataVersion(v => v + 1);
+      setCurrentPage(1);
+  };
+
+  // Filter Data based on Tab, Filters, and Search
+  const filteredData = useMemo(() => {
+    const v = dataVersion; // Dependency
+    let data = bankData.filter(d => 
+        activeTab === "retrait" ? d.type === "Retrait" : d.type === "Dépôt"
+    );
+    
+    // 1. Filter by Date
+    data = data.filter(t => {
+        const transactionDate = new Date(t.date);
+        const monthNumber = (transactionDate.getMonth() + 1).toString();
+        const matchMonth = filterMonth === "" || monthNumber === filterMonth;
+        const matchYear = filterYear === "" || transactionDate.getFullYear().toString() === filterYear;
+        return matchMonth && matchYear;
+    });
+
+    // 2. Filter by Search Term
+    if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+        data = data.filter(t => 
+            t.description.toLowerCase().includes(term) || 
+            (t.numeroCheque && t.numeroCheque.toLowerCase().includes(term))
+        );
+    }
+
+    // Triez par date par défaut (la plus récente d'abord)
+    data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    
+    return data;
+  }, [activeTab, dataVersion, searchTerm, filterMonth, filterYear]);
+
+  // Calcul du total des éléments filtrés (pour la nouvelle carte)
+  const totalFilteredAmount = useMemo(() => {
+    // Calculer la somme des montants. Puisque le filtre est par type, nous prenons la valeur absolue.
+    return filteredData.reduce((sum, item) => sum + Math.abs(item.montant), 0);
+  }, [filteredData]);
+
+  // Pagination Logic
+  const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedData = filteredData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  if (isLoading) return <LoadingScreen />;
+
   return (
     <div className="flex min-h-screen bg-zinc-50 font-sans text-black">
-      {/* SIDEBAR IDENTIQUE */}
+      {/* SIDEBAR */}
       <aside className="sticky top-0 flex h-screen w-72 flex-col justify-between bg-black px-6 py-8 text-white">
         <div className="space-y-8">
           <div className="flex items-center gap-3">
@@ -475,57 +527,64 @@ export default function BanquePage() {
                 <h1 className="text-3xl font-bold">Transaction Bancaire</h1>
                 <p className="mt-2 text-sm text-black/60">Gérez les chèques émis et les dépôts bancaires.</p>
             </div>
+            {/* Carte Solde Sécurisé (en haut à droite) */}
             <SecureSoldeCard soldeActuel={soldeBanqueActuel} showToast={showToast} />
         </header>
 
-        {/* Filtres et Recherche */}
-        <div className="mb-6 rounded-3xl border border-black/5 bg-white p-6 shadow-[0_15px_45px_rgba(0,0,0,0.05)]">
-            <div className="flex flex-wrap items-center gap-3">
-                
-                {/* Search Input */}
-                <div className="flex flex-1 items-center gap-3 rounded-full border border-black/10 bg-zinc-50 px-4 py-2.5">
-                    <SearchIcon />
-                    <input
-                        value={searchTerm}
-                        onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                        className="flex-1 bg-transparent text-sm outline-none placeholder:text-black/40"
-                        placeholder="Rechercher par description ou n° chèque..."
-                    />
-                </div>
+        {/* Filtres, Recherche ET Total Filtré */}
+        <div className="mb-6 flex gap-4">
+            {/* Filtres et Recherche */}
+            <div className="flex flex-1 flex-col rounded-3xl border border-black/5 bg-white p-6 shadow-[0_15px_45px_rgba(0,0,0,0.05)]">
+                <div className="flex flex-wrap items-center gap-3">
+                    
+                    {/* Search Input */}
+                    <div className="flex flex-1 items-center gap-3 rounded-full border border-black/10 bg-zinc-50 px-4 py-2.5">
+                        <SearchIcon />
+                        <input
+                            value={searchTerm}
+                            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                            className="flex-1 bg-transparent text-sm outline-none placeholder:text-black/40"
+                            placeholder="Rechercher par description ou n° chèque..."
+                        />
+                    </div>
 
-                {/* Filter Dropdowns */}
-                <div className="flex items-center gap-2 rounded-full border border-black/10 bg-zinc-50 px-4 py-2">
-                    <CalendarIcon />
-                    <select
-                        value={filterMonth}
-                        onChange={(e) => { setFilterMonth(e.target.value); setCurrentPage(1); }}
-                        className="bg-transparent text-sm outline-none"
-                    >
-                        {months.map((month) => (<option key={month.value} value={month.value}>{month.label}</option>))}
-                    </select>
-                </div>
+                    {/* Filter Dropdowns */}
+                    <div className="flex items-center gap-2 rounded-full border border-black/10 bg-zinc-50 px-4 py-2">
+                        <CalendarIcon />
+                        <select
+                            value={filterMonth}
+                            onChange={(e) => { setFilterMonth(e.target.value); setCurrentPage(1); }}
+                            className="bg-transparent text-sm outline-none"
+                        >
+                            {months.map((month) => (<option key={month.value} value={month.value}>{month.label}</option>))}
+                        </select>
+                    </div>
 
-                <div className="flex items-center gap-2 rounded-full border border-black/10 bg-zinc-50 px-4 py-2">
-                    <CalendarIcon />
-                    <select
-                        value={filterYear}
-                        onChange={(e) => { setFilterYear(e.target.value); setCurrentPage(1); }}
-                        className="bg-transparent text-sm outline-none"
+                    <div className="flex items-center gap-2 rounded-full border border-black/10 bg-zinc-50 px-4 py-2">
+                        <CalendarIcon />
+                        <select
+                            value={filterYear}
+                            onChange={(e) => { setFilterYear(e.target.value); setCurrentPage(1); }}
+                            className="bg-transparent text-sm outline-none"
+                        >
+                            <option value="">Toutes les années</option>
+                            {years.slice(1).map((year) => (<option key={year} value={year}>{year}</option>))}
+                        </select>
+                    </div>
+                    
+                    {/* Reset Filter Button */}
+                    <button
+                        onClick={handleResetFilters}
+                        className="flex items-center gap-2 rounded-full border border-black/10 bg-zinc-50 px-4 py-2.5 text-sm font-semibold text-black/70 transition hover:bg-zinc-100"
                     >
-                        <option value="">Toutes les années</option>
-                        {years.slice(1).map((year) => (<option key={year} value={year}>{year}</option>))}
-                    </select>
+                        <RefreshIcon />
+                        <span>Réinitialiser</span>
+                    </button>
                 </div>
-                
-                {/* Reset Filter Button */}
-                <button
-                    onClick={handleResetFilters}
-                    className="flex items-center gap-2 rounded-full border border-black/10 bg-zinc-50 px-4 py-2.5 text-sm font-semibold text-black/70 transition hover:bg-zinc-100"
-                >
-                    <RefreshIcon />
-                    <span>Réinitialiser</span>
-                </button>
             </div>
+
+            {/* Carte Total Sommes Filtrées */}
+            <TotalFilterCard total={totalFilteredAmount} activeTab={activeTab} />
         </div>
 
         {/* Action Bar & Tabs */}
@@ -603,7 +662,7 @@ export default function BanquePage() {
                                     
                                     {/* Cellule Montant colorée */}
                                     <td className={`px-6 py-4 text-sm font-bold ${item.montant < 0 ? "text-red-600" : "text-emerald-600"}`}>
-                                        {item.montant > 0 ? "+" : ""}{Math.abs(item.montant).toLocaleString()} €
+                                        {item.montant > 0 ? "+" : ""}{Math.abs(item.montant).toLocaleString('fr-FR')} €
                                     </td>
                                     
                                     <td className="px-6 py-4 text-sm text-black/60">
@@ -620,6 +679,7 @@ export default function BanquePage() {
                                             <EditIcon />
                                         </button>
                                     </td>
+                                
                                 </tr>
                             ))
                         )}
@@ -630,7 +690,10 @@ export default function BanquePage() {
 
         {/* Pagination */}
         <div className="mt-6 rounded-3xl border border-black/5 bg-white p-6 shadow-[0_15px_45px_rgba(0,0,0,0.05)]">
-          <div className="flex flex-wrap items-center justify-end gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="text-sm text-black/60">
+                Affichage de {Math.min(filteredData.length, startIndex + 1)} à {Math.min(filteredData.length, startIndex + ITEMS_PER_PAGE)} sur {filteredData.length} transactions.
+            </div>
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
@@ -644,7 +707,7 @@ export default function BanquePage() {
               </span>
               <button
                 onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
+                disabled={currentPage === totalPages || totalPages === 0}
                 className="rounded-xl border border-black/10 p-2.5 text-black/60 transition hover:bg-black/5 disabled:opacity-30 disabled:hover:bg-transparent"
               >
                 <ChevronRightIcon />
@@ -684,6 +747,10 @@ export default function BanquePage() {
             title={activeTab === "retrait" ? "Nouveau Chèque / Retrait" : "Nouveau Dépôt"} 
             onSubmit={handleAddItem} 
             onClose={() => setIsAddModalOpen(false)} 
+            formData={formData}
+            setFormData={setFormData}
+            isRetrait={activeTab === "retrait"}
+            isModification={false}
           />
       )}
 
@@ -693,6 +760,9 @@ export default function BanquePage() {
             title={`Modifier ${formData.type || selectedItem?.type}`} 
             onSubmit={handleSaveModification} 
             onClose={() => setIsModifyModalOpen(false)} 
+            formData={formData}
+            setFormData={setFormData}
+            isRetrait={formData.type === "Retrait"}
             isModification={true}
           />
       )}
