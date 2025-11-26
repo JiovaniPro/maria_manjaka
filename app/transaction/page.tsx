@@ -8,13 +8,11 @@ import { useToast } from "@/components/ToastContainer"; // Vérifiez ce chemin d
 import { LoadingScreen } from "@/components/LoadingScreen"; // Vérifiez ce chemin d'import
 import { useLoading } from "@/hooks/useLoading"; // Vérifiez ce chemin d'import
 
-// Mot de passe secret pour la modification (SIMULATION)
-const SECRET_PASSWORD = "1234";
-
 // ====================================================================
-// TYPES & MOCK DATA
+// TYPES & CONSTANTES STATIQUES (API/APP)
 // ====================================================================
 
+// --- TYPES
 type Transaction = {
   id: string;
   date: string;
@@ -38,35 +36,8 @@ type PreferenceItem = { label: string; icon: () => ReactElement };
 type SortField = "date" | "montant" | "description";
 type SortOrder = "asc" | "desc" | null;
 
-// Variables pour API - Soldes des comptes
-const soldeCaisse = 500; // Solde actuel de la caisse
-const soldeBanque = 10000; // Solde actuel de la banque
-
-// Variables pour API - Transactions (Utilisation de let pour pouvoir simuler l'ajout/suppression)
-let transactionsData: Transaction[] = [
-  { id: "1", date: "2024-10-18", description: "Offrande Culte", montant: 1350, montantAffiche: "+1.350€", type: "Revenu", categorie: "Offrandes Cultes", compte: "Caisse" },
-  { id: "2", date: "2024-10-18", description: "Description", montant: -300, montantAffiche: "-300€", type: "Dépense", categorie: "Matériel", compte: "Caisse" },
-  { id: "3", date: "2024-11-15", description: "Offrande Culte", montant: 1350, montantAffiche: "+1.350€", type: "Revenu", categorie: "Offrandes Cultes", compte: "Caisse" },
-  { id: "4", date: "2024-11-18", description: "Achat Fournitures", montant: -1120, montantAffiche: "-1120€", type: "Dépense", categorie: "Dîme", compte: "Banque A" },
-  { id: "5", date: "2024-09-17", description: "Achat Fournitures", montant: -120, montantAffiche: "-120€", type: "Dépense", categorie: "Dîme", compte: "Banque A" },
-  { id: "6", date: "2024-09-17", description: "Dîme J. Dupont", montant: 250, montantAffiche: "+250€", type: "Revenu", categorie: "Dîme", compte: "Caisse" },
-  { id: "7", date: "2024-11-18", description: "Location Salle", montant: 250, montantAffiche: "+250€", type: "Revenu", categorie: "Matériel", compte: "Banque A" },
-  { id: "8", date: "2024-12-05", description: "Description", montant: 250, montantAffiche: "+250€", type: "Revenu", categorie: "Dîme", compte: "Caisse" },
-];
-
-// Variables pour API - Catégories
-const categoriesData: Category[] = [
-  { id: "1", nom: "Dîme", type: "Revenu", statut: "actif" },
-  { id: "2", nom: "Offrandes Cultes", type: "Revenu", statut: "actif" },
-  { id: "3", nom: "Vente de Livres", type: "Revenu", statut: "inactif" },
-  { id: "4", nom: "Dons", type: "Revenu", statut: "actif" },
-  { id: "5", nom: "Location de Salles", type: "Revenu", statut: "actif" },
-  { id: "10", nom: "Loyer", type: "Dépense", statut: "actif" },
-  { id: "11", nom: "Salaires", type: "Dépense", statut: "actif" },
-  { id: "12", nom: "Électricité", type: "Dépense", statut: "actif" },
-  { id: "13", nom: "Entretien", type: "Dépense", statut: "actif" },
-  { id: "14", nom: "Matériel", type: "Dépense", statut: "actif" },
-];
+// --- CONSTANTES
+const SECRET_PASSWORD = "1234"; // Simulation
 
 const months = [
   { value: "", label: "Tous les mois" },
@@ -86,141 +57,83 @@ const months = [
 
 const years = ["", "2024", "2023", "2022", "2021"];
 
-// ====================================================================
-// ICON COMPONENTS (SIDEBAR - Style "Fill" harmonisé)
-// ====================================================================
+// --- NAVIGATION
+const navItems: NavItem[] = [
+  { label: "Dashboard", icon: DashboardIcon, href: "/dashboard" },
+  { label: "Transactions", icon: TransactionsIcon, href: "/transaction" },
+  { label: "Catégories", icon: CategoriesIcon, href: "/categorie" },
+  { label: "Transaction Bancaire", icon: UsersIcon, href: "/banque" },
+];
 
-function DashboardIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" stroke="none">
-      <path d="M4 3h7v9H4zM13 3h7v5h-7zM13 10h7v11h-7zM4 14h7v7H4z" />
-    </svg>
-  );
-}
+const preferenceItems: PreferenceItem[] = [
+  { label: "Paramètres", icon: SettingsIcon },
+  // { label: "Aide", icon: HelpIcon },
+];
 
-function TransactionsIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
-      <path d="M3 5h18v2H3zM3 11h18v2H3zM3 17h18v2H3z" />
-    </svg>
-  );
-}
+// --- DONNÉES FACTICES INITIALES (À REMPLACER PAR VOTRE CHARGEMENT API)
+const initialCategoriesData: Category[] = [
+  { id: "1", nom: "Dîme", type: "Revenu", statut: "actif" },
+  { id: "2", nom: "Offrandes Cultes", type: "Revenu", statut: "actif" },
+  { id: "3", nom: "Vente de Livres", type: "Revenu", statut: "inactif" },
+  { id: "4", nom: "Dons", type: "Revenu", statut: "actif" },
+  { id: "5", nom: "Location de Salles", type: "Revenu", statut: "actif" },
+  { id: "10", nom: "Loyer", type: "Dépense", statut: "actif" },
+  { id: "11", nom: "Salaires", type: "Dépense", statut: "actif" },
+  { id: "12", nom: "Électricité", type: "Dépense", statut: "actif" },
+  { id: "13", nom: "Entretien", type: "Dépense", statut: "actif" },
+  { id: "14", nom: "Matériel", type: "Dépense", statut: "actif" },
+];
 
-function AccountsIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
-      <path d="M4 4h16v6H4zM4 14h16v6H4z" />
-    </svg>
-  );
-}
-
-function CategoriesIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
-      <path d="M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z" />
-    </svg>
-  );
-}
-
-function ReportsIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
-      <path d="M5 3h4l2 3h8v15H5z" />
-    </svg>
-  );
-}
-
-function UsersIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
-      <path d="M12 12a5 5 0 100-10 5 5 0 000 10zm-7 9v-1a5 5 0 015-5h4a5 5 0 015 5v1z" />
-    </svg>
-  );
-}
-
-function SettingsIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
-      <path d="M12 15a3 3 0 110-6 3 3 0 010 6zm8.6-3.5l1.4 2.5-2.1 3.6-2.9-.3a7.1 7.1 0 01-1.6 1l-.5 2.8H9.1l-.5-2.8a7.1 7.1 0 01-1.6-1l-2.9.3-2.1-3.6 1.4-2.5a7.6 7.6 0 010-1l-1.4-2.5L4.1 4.4l2.9.3a7.1 7.1 0 011.6-1L9.1 1h5.8l.5 2.8a7.1 7.1 0 011.6 1l2.9-.3 2.1 3.6-1.4 2.5a7.6 7.6 0 010 1z"/>
-    </svg>
-  );
-}
-
-function HelpIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
-      <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 15h-1v-2h2v2zm1.1-4.4l-.6.4V14h-1v-2l1-.7a1.6 1.6 0 10-2.5-1.3H8.9A3.1 3.1 0 1113.1 12z" />
-    </svg>
-  );
-}
-
-function LogoutIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
-      <path d="M10 3h10v18H10v-2h8V5h-8zm-1 6l-4 3 4 3v-2h7v-2H9z" />
-    </svg>
-  );
-}
+let initialTransactionsData: Transaction[] = [
+  { id: "1", date: "2024-10-18", description: "Offrande Culte", montant: 1350, montantAffiche: "+1.350€", type: "Revenu", categorie: "Offrandes Cultes", compte: "Caisse" },
+  { id: "2", date: "2024-10-18", description: "Achat Fournitures", montant: -300, montantAffiche: "-300€", type: "Dépense", categorie: "Matériel", compte: "Caisse" },
+  { id: "3", date: "2024-11-15", description: "Offrande Culte", montant: 1350, montantAffiche: "+1.350€", type: "Revenu", categorie: "Offrandes Cultes", compte: "Caisse" },
+  { id: "4", date: "2024-11-18", description: "Paiement Loyer", montant: -1120, montantAffiche: "-1120€", type: "Dépense", categorie: "Loyer", compte: "Banque A" },
+  { id: "5", date: "2024-09-17", description: "Achat Fournitures", montant: -120, montantAffiche: "-120€", type: "Dépense", categorie: "Matériel", compte: "Banque A" },
+  { id: "6", date: "2024-09-17", description: "Dîme J. Dupont", montant: 250, montantAffiche: "+250€", type: "Revenu", categorie: "Dîme", compte: "Caisse" },
+  { id: "7", date: "2024-11-18", description: "Location Salle", montant: 250, montantAffiche: "+250€", type: "Revenu", categorie: "Location de Salles", compte: "Banque A" },
+  { id: "8", date: "2024-12-05", description: "Dons Anonymes", montant: 250, montantAffiche: "+250€", type: "Revenu", categorie: "Dons", compte: "Caisse" },
+];
 
 // ====================================================================
-// ICON COMPONENTS (UTILITY - Spécifiques à cette page)
+// ICON COMPONENTS
 // ====================================================================
+// (Non modifiés, laissés pour que le code reste complet)
 
-// function IconChurch() { return <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3L2 12h3v8z" /></svg>; }
-function IconChurch() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-8 w-8 text-white" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <path d="M12 2v6m-4-2 4-4 4 4M5 22v-7l7-5 7 5v7z" strokeLinecap="round" />
-    </svg>
-  );
-}
-function SearchIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5 text-black/40" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /></svg>; }
-function PlusIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>; }
-function CalendarIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5 text-black/60" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>; }
-function FilterIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5 text-black/60" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3l10 10V18l4 2v-7l10-10" /></svg>; }
-function MenuIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5 text-black/60" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12h18M3 6h18M3 18h18" /></svg>; }
-function TagIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5 text-black/60" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 5l-7 7l7 7" /></svg>; }
-function CalculatorIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><rect x="4" y="2" width="16" height="20" rx="2" ry="2" /><path d="M8 6h8M8 10h8M8 14h8M8 18h4" /></svg>; }
-function ArrowUpIcon() { return <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 19V5M5 12l7-7l7 7" /></svg>; }
-function ArrowDownIcon() { return <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M19 12l-7 7l-7-7" /></svg>; }
-// function EditIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5 text-black/60" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" /></svg>; }
-function EditIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
-      <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
-    </svg>
-  );
-}
-function DeleteIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M3 6h18m-2 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
-    </svg>
-  );
-}
-// function TrashIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5 text-black/60" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" /></svg>; }
-function CloseIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>; }
-function RefreshIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 0 0-9-9c-1.88 0-3.66.6-5.05 1.7L3 6M21 12h-4M3 12h4M6 18l-3-3h6l3 3m-9 0v-4" /></svg>; }
-function ChevronLeftIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>; }
-function ChevronRightIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>; }
-
+function DashboardIcon() { return (<svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" stroke="none"><path d="M4 3h7v9H4zM13 3h7v5h-7zM13 10h7v11h-7zM4 14h7v7H4z" /></svg>); }
+function TransactionsIcon() { return (<svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor"><path d="M3 5h18v2H3zM3 11h18v2H3zM3 17h18v2H3z" /></svg>); }
+function CategoriesIcon() { return (<svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor"><path d="M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z" /></svg>); }
+function UsersIcon() { return (<svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor"><path d="M12 12a5 5 0 100-10 5 5 0 000 10zm-7 9v-1a5 5 0 015-5h4a5 5 0 015 5v1z" /></svg>); }
+function SettingsIcon() { return (<svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor"><path d="M12 15a3 3 0 110-6 3 3 0 010 6zm8.6-3.5l1.4 2.5-2.1 3.6-2.9-.3a7.1 7.1 0 01-1.6 1l-.5 2.8H9.1l-.5-2.8a7.1 7.1 0 01-1.6-1l-2.9.3-2.1-3.6 1.4-2.5a7.6 7.6 0 010-1l-1.4-2.5L4.1 4.4l2.9.3a7.1 7.1 0 011.6-1L9.1 1h5.8l.5 2.8a7.1 7.1 0 011.6 1l2.9-.3 2.1 3.6-1.4 2.5a7.6 7.6 0 010 1z"/></svg>); }
+function HelpIcon() { return (<svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 15h-1v-2h2v2zm1.1-4.4l-.6.4V14h-1v-2l1-.7a1.6 1.6 0 10-2.5-1.3H8.9A3.1 3.1 0 1113.1 12z" /></svg>); }
+function LogoutIcon() { return (<svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor"><path d="M10 3h10v18H10v-2h8V5h-8zm-1 6l-4 3 4 3v-2h7v-2H9z" /></svg>); }
+function IconChurch() { return (<svg viewBox="0 0 24 24" className="h-8 w-8 text-white" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 2v6m-4-2 4-4 4 4M5 22v-7l7-5 7 5v7z" strokeLinecap="round" /></svg>); }
+function SearchIcon() { return (<svg viewBox="0 0 24 24" className="h-5 w-5 text-black/40" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /></svg>); }
+function PlusIcon() { return (<svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>); }
+function CalendarIcon() { return (<svg viewBox="0 0 24 24" className="h-5 w-5 text-black/60" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>); }
+function FilterIcon() { return (<svg viewBox="0 0 24 24" className="h-5 w-5 text-black/60" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3l10 10V18l4 2v-7l10-10" /></svg>); }
+function MenuIcon() { return (<svg viewBox="0 0 24 24" className="h-5 w-5 text-black/60" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12h18M3 6h18M3 18h18" /></svg>); }
+function TagIcon() { return (<svg viewBox="0 0 24 24" className="h-5 w-5 text-black/60" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 5l-7 7l7 7" /></svg>); }
+function CalculatorIcon() { return (<svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><rect x="4" y="2" width="16" height="20" rx="2" ry="2" /><path d="M8 6h8M8 10h8M8 14h8M8 18h4" /></svg>); }
+function ArrowUpIcon() { return (<svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 19V5M5 12l7-7l7 7" /></svg>); }
+function ArrowDownIcon() { return (<svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M19 12l-7 7l-7-7" /></svg>); }
+function EditIcon() { return (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>); }
+function DeleteIcon() { return (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18m-2 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>); }
+function CloseIcon() { return (<svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>); }
+function RefreshIcon() { return (<svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 0 0-9-9c-1.88 0-3.66.6-5.05 1.7L3 6M21 12h-4M3 12h4M6 18l-3-3h6l3 3m-9 0v-4" /></svg>); }
+function ChevronLeftIcon() { return (<svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>); }
+function ChevronRightIcon() { return (<svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>); }
 function SortIcon({ field, currentField, order }: { field: SortField; currentField: SortField | null; order: SortOrder }) {
-  if (currentField !== field) {
-    return <svg viewBox="0 0 24 24" className="h-3 w-3 text-black/30" fill="currentColor"><path d="M12 5l6 6H6l6-6zM12 19l-6-6h12l-6 6z" /></svg>;
-  }
-  if (order === "asc") {
-    return <svg viewBox="0 0 24 24" className="h-3 w-3" fill="currentColor"><path d="M12 5l6 6H6z" /></svg>;
-  }
-  if (order === "desc") {
-    return <svg viewBox="0 0 24 24" className="h-3 w-3" fill="currentColor"><path d="M12 19l-6-6h12z" /></svg>;
-  }
+  if (currentField !== field) { return <svg viewBox="0 0 24 24" className="h-3 w-3 text-black/30" fill="currentColor"><path d="M12 5l6 6H6l6-6zM12 19l-6-6h12l-6 6z" /></svg>; }
+  if (order === "asc") { return <svg viewBox="0 0 24 24" className="h-3 w-3" fill="currentColor"><path d="M12 5l6 6H6z" /></svg>; }
+  if (order === "desc") { return <svg viewBox="0 0 24 24" className="h-3 w-3" fill="currentColor"><path d="M12 19l-6-6h12z" /></svg>; }
   return null;
 }
 
 // ====================================================================
-// CONFIRM MODAL
+// MODAL COMPONENTS (Extraits pour corriger le bug de focus)
 // ====================================================================
+
 function ConfirmModal({ isOpen, onClose, onConfirm, title, message }: {
   isOpen: boolean;
   onClose: () => void;
@@ -254,324 +167,22 @@ function ConfirmModal({ isOpen, onClose, onConfirm, title, message }: {
   );
 }
 
-// ====================================================================
-// NAVIGATION DATA
-// ====================================================================
-
-const navItems: NavItem[] = [
-  { label: "Dashboard", icon: DashboardIcon, href: "/dashboard" },
-  { label: "Transactions", icon: TransactionsIcon, href: "/transaction" },
-  { label: "Comptes", icon: AccountsIcon, href: "/comptes" },
-  { label: "Catégories", icon: CategoriesIcon, href: "/categorie" },
-  { label: "Rapports", icon: ReportsIcon, href: "/rapports" },
-  { label: "Transaction Bancaire", icon: UsersIcon, href: "/banque" },
-];
-
-const preferenceItems: PreferenceItem[] = [
-  { label: "Paramètres", icon: SettingsIcon },
-  { label: "Aide", icon: HelpIcon },
-];
-
-// ====================================================================
-// MAIN COMPONENT
-// ====================================================================
-
-export default function TransactionsPage() {
-  const pathname = usePathname();
-  const router = useRouter();
-  const { showToast } = useToast();
-  const isLoading = useLoading(1200);
-
-  // --- Filter States
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterCompte, setFilterCompte] = useState("");
-  const [filterCategorie, setFilterCategorie] = useState("");
-  const [filterMonth, setFilterMonth] = useState("");
-  const [filterYear, setFilterYear] = useState("");
-  const [filterType, setFilterType] = useState<"" | "Revenu" | "Dépense">("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [sortField, setSortField] = useState<SortField | null>(null);
-  const [sortOrder, setSortOrder] = useState<SortOrder>(null);
-  
-  // --- Forcer le re-rendu après modification/suppression
-  const [dataVersion, setDataVersion] = useState(0);
-
-  // --- Add/Modify Modal States
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isModifyModalOpen, setIsModifyModalOpen] = useState(false);
-  const [selectedTransactionToModify, setSelectedTransactionToModify] = useState<Transaction | null>(null);
-  const [formData, setFormData] = useState({
-    id: "", // Ajout de l'ID pour la modification
-    date: new Date().toISOString().substring(0, 10),
-    description: "",
-    montant: "",
-    type: "Revenu" as "Revenu" | "Dépense",
-    categorie: "",
-    compte: "",
-    numeroCheque: "",
-  });
-
-  // --- Security & Delete States
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [authPassword, setAuthPassword] = useState("");
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [transactionToDelete, setTransactionToDelete] = useState<string | null>(null);
-
-  const itemsPerPage = 8;
-
-  // --- Handlers & Logic
-
-  const handleResetFilters = () => {
-    setSearchTerm("");
-    setFilterCompte("");
-    setFilterCategorie("");
-    setFilterMonth("");
-    setFilterYear("");
-    setFilterType("");
-    setCurrentPage(1);
-  };
-
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      if (sortOrder === null) {
-        setSortOrder("asc");
-      } else if (sortOrder === "asc") {
-        setSortOrder("desc");
-      } else {
-        setSortOrder(null);
-        setSortField(null);
-      }
-    } else {
-      setSortField(field);
-      setSortOrder("asc");
-    }
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const handleTypeChange = (newType: "Revenu" | "Dépense") => {
-    setFormData({
-      ...formData,
-      type: newType,
-      categorie: "", // Reset categorie on type change
-      compte: "", // Reset compte on type change
-      numeroCheque: "",
-    });
-  };
-
-  const getSortedTransactions = () => {
-    let sorted = [...transactionsData];
-
-    if (sortField && sortOrder) {
-      sorted.sort((a, b) => {
-        let aValue: any;
-        let bValue: any;
-
-        if (sortField === "date") {
-          aValue = new Date(a.date).getTime();
-          bValue = new Date(b.date).getTime();
-        } else if (sortField === "montant") {
-          aValue = a.montant;
-          bValue = b.montant;
-        } else if (sortField === "description") {
-          aValue = a.description.toLowerCase();
-          bValue = a.description.toLowerCase();
-        }
-
-        if (sortOrder === "asc") {
-          return aValue > bValue ? 1 : -1;
-        } else {
-          return aValue < bValue ? 1 : -1;
-        }
-      });
-    }
-
-    return sorted;
-  };
-
-  const filteredTransactions = useMemo(() => {
-    // Dépendance à dataVersion ajoutée pour forcer le re-calcul après CRUD
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const version = dataVersion; 
-    return getSortedTransactions().filter((t) => {
-      const matchSearch = t.description.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchCompte = filterCompte === "" || t.compte === filterCompte;
-      const matchCategorie = filterCategorie === "" || t.categorie === filterCategorie;
-      const matchType = filterType === "" || t.type === filterType;
-
-      const transactionDate = new Date(t.date);
-      const matchMonth = filterMonth === "" || transactionDate.getMonth() + 1 === parseInt(filterMonth);
-      const matchYear = filterYear === "" || transactionDate.getFullYear() === parseInt(filterYear);
-
-      return matchSearch && matchCompte && matchCategorie && matchType && matchMonth && matchYear;
-    });
-  }, [searchTerm, filterCompte, filterCategorie, filterType, filterMonth, filterYear, sortField, sortOrder, dataVersion]);
-
-  const totalMontant = useMemo(() => {
-    return filteredTransactions.reduce((sum, t) => sum + t.montant, 0);
-  }, [filteredTransactions]);
-
-  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedTransactions = filteredTransactions.slice(startIndex, startIndex + itemsPerPage);
-
-  const availableCategories = categoriesData.filter(
-    (cat) => cat.type === formData.type && cat.statut === "actif"
-  );
-
-  const montantNumber = parseFloat(formData.montant) || 0;
-  const isCaisseDisabled = formData.type === "Dépense" && montantNumber > soldeCaisse;
-  const showNumeroCheque = formData.type === "Dépense" && formData.compte === "Banque A";
-
-
-  // --- Security & Modify Logic
-
-  const startModify = (transaction: Transaction) => {
-    setSelectedTransactionToModify(transaction);
-    setAuthPassword("");
-    setIsAuthModalOpen(true);
-  };
-
-  const handleAuthSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (authPassword === SECRET_PASSWORD) {
-      showToast("Mot de passe correct. Ouverture du modal de modification.", "success");
-      setIsAuthModalOpen(false);
-
-      if (selectedTransactionToModify) {
-        // Préremplir le formulaire avec les données de la transaction
-        const montantAbsolu = Math.abs(selectedTransactionToModify.montant).toString();
-        setFormData({
-          id: selectedTransactionToModify.id,
-          date: selectedTransactionToModify.date,
-          description: selectedTransactionToModify.description,
-          montant: montantAbsolu,
-          type: selectedTransactionToModify.type,
-          categorie: selectedTransactionToModify.categorie,
-          compte: selectedTransactionToModify.compte,
-          numeroCheque: "", // Dans une vraie application, cela viendrait de la transaction
-        });
-        setIsModifyModalOpen(true);
-      }
-    } else {
-      showToast("Mot de passe incorrect.", "error");
-      setAuthPassword("");
-    }
-  };
-
-  const handleModifyTransaction = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (showNumeroCheque && !formData.numeroCheque) {
-      showToast("Le numéro de chèque est obligatoire pour un paiement par banque", "warning");
-      return;
-    }
-
-    const index = transactionsData.findIndex(t => t.id === formData.id);
-
-    if (index !== -1) {
-      const montantFinal = formData.type === "Revenu" ? montantNumber : -montantNumber;
-
-      transactionsData[index] = {
-        ...transactionsData[index],
-        date: formData.date,
-        description: formData.description,
-        montant: montantFinal,
-        montantAffiche: montantFinal >= 0 ? `+${montantNumber}€` : `-${montantNumber}€`,
-        type: formData.type,
-        categorie: formData.categorie,
-        compte: formData.compte,
-      };
-
-      showToast("Transaction modifiée avec succès", "success");
-      setIsModifyModalOpen(false);
-      setSelectedTransactionToModify(null);
-      setFormData({
-        id: "", date: new Date().toISOString().substring(0, 10), description: "", montant: "", type: "Revenu", categorie: "", compte: "", numeroCheque: "",
-      });
-      setDataVersion(v => v + 1); // Forcer le re-rendu
-    }
-  };
-
-  // --- Delete Logic
-
-  const startDelete = (id: string) => {
-    setTransactionToDelete(id);
-    setIsDeleteModalOpen(true);
-  };
-
-  const confirmDelete = () => {
-    if (transactionToDelete) {
-      const index = transactionsData.findIndex(t => t.id === transactionToDelete);
-      if (index !== -1) {
-        transactionsData.splice(index, 1);
-        showToast(`Transaction ${transactionToDelete} supprimée.`, "error");
-      }
-      setIsDeleteModalOpen(false);
-      setTransactionToDelete(null);
-      setDataVersion(v => v + 1); // Forcer le re-rendu
-    }
-  };
-
-  // --- Add Logic
-
-  const handleAddTransaction = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (showNumeroCheque && !formData.numeroCheque) {
-      showToast("Le numéro de chèque est obligatoire pour un paiement par banque", "warning");
-      return;
-    }
-
-    if (montantNumber <= 0) {
-      showToast("Le montant doit être supérieur à zéro", "warning");
-      return;
-    }
-
-    const newTransaction: Transaction = {
-      id: (transactionsData.length + 1).toString(),
-      date: formData.date,
-      description: formData.description,
-      montant: formData.type === "Revenu" ? montantNumber : -montantNumber,
-      montantAffiche: formData.type === "Revenu" ? `+${montantNumber}€` : `-${montantNumber}€`,
-      type: formData.type,
-      categorie: formData.categorie,
-      compte: formData.compte,
-    };
-
-    transactionsData.push(newTransaction);
-
-    showToast("Transaction ajoutée avec succès", "success");
-    setIsAddModalOpen(false);
-    setFormData({
-      id: "", date: new Date().toISOString().substring(0, 10), description: "", montant: "", type: "Revenu", categorie: "", compte: "", numeroCheque: "",
-    });
-    setDataVersion(v => v + 1); // Forcer le re-rendu
-  };
-
-  const handleLogout = () => {
-    showToast("Déconnexion réussie", "success");
-    // Navigation immédiate pour éviter l'erreur de composant non monté
-    router.push("/connexion"); 
-  };
-
-  if (isLoading) {
-    return <LoadingScreen />;
-  }
-
-  // Composant du formulaire (utilisé pour l'ajout et la modification)
-  const TransactionForm = ({ onSubmit, title, onClose, isModification = false }: {
-    onSubmit: (e: React.FormEvent) => void;
-    title: string;
-    onClose: () => void;
-    isModification?: boolean;
-  }) => (
+// Composant de formulaire Transaction (EXTRAIT DU COMPOSANT PRINCIPAL)
+function TransactionForm({ onSubmit, title, onClose, isModification = false, formData, handleInputChange, handleTypeChange, availableCategories, isCaisseDisabled, showNumeroCheque, soldeCaisse, soldeBanque }: {
+  onSubmit: (e: React.FormEvent) => void;
+  title: string;
+  onClose: () => void;
+  isModification?: boolean;
+  formData: any; // Utilisation de 'any' pour la simplicité, mais devrait être le type de 'formData'
+  handleInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
+  handleTypeChange: (newType: "Revenu" | "Dépense") => void;
+  availableCategories: Category[];
+  isCaisseDisabled: boolean;
+  showNumeroCheque: boolean;
+  soldeCaisse: number;
+  soldeBanque: number;
+}) {
+  return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="w-full max-w-lg rounded-3xl border border-black/10 bg-white p-8 shadow-2xl max-h-[90vh] overflow-y-auto">
         <div className="mb-6 flex items-center justify-between">
@@ -640,6 +251,8 @@ export default function TransactionsPage() {
                 min="0.01"
                 step="0.01"
                 required
+                // Ajout d'une clé pour s'assurer que l'input est re-rendu correctement si nécessaire (bonne pratique)
+                key="montant-input" 
                 className="w-full rounded-xl border border-black/10 bg-zinc-50 p-3 text-sm focus:border-blue-500 focus:ring-blue-500"
               />
             </div>
@@ -744,6 +357,321 @@ export default function TransactionsPage() {
       </div>
     </div>
   );
+}
+
+
+// ====================================================================
+// MAIN COMPONENT
+// ====================================================================
+
+export default function TransactionsPage() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const { showToast } = useToast();
+  const isLoading = useLoading(1200);
+
+  // --- VARIABLES D'ÉTAT POUR L'API (À ALIMENTER PAR VOS HOOKS API)
+  // ⚠️ Remplacez ces useState par la récupération de données de votre API
+  const [transactions, setTransactions] = useState<Transaction[]>(initialTransactionsData);
+  const [categoriesData, setCategoriesData] = useState<Category[]>(initialCategoriesData); // Les catégories peuvent être chargées une fois
+  const [soldeCaisse, setSoldeCaisse] = useState(500); // Solde actuel de la caisse
+  const [soldeBanque, setSoldeBanque] = useState(10000); // Solde actuel de la banque
+  // ------------------------------------------------------------------
+
+  // --- Filter States
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterCompte, setFilterCompte] = useState("");
+  const [filterCategorie, setFilterCategorie] = useState("");
+  const [filterMonth, setFilterMonth] = useState("");
+  const [filterYear, setFilterYear] = useState("");
+  const [filterType, setFilterType] = useState<"" | "Revenu" | "Dépense">("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortOrder, setSortOrder] = useState<SortOrder>(null);
+  
+  // --- Forcer le re-rendu après modification/suppression
+  // Cette variable est maintenant gérée par le `setTransactions` du useState
+  // const [dataVersion, setDataVersion] = useState(0); 
+
+  // --- Add/Modify Modal States
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isModifyModalOpen, setIsModifyModalOpen] = useState(false);
+  const [selectedTransactionToModify, setSelectedTransactionToModify] = useState<Transaction | null>(null);
+  const [formData, setFormData] = useState({
+    id: "",
+    date: new Date().toISOString().substring(0, 10),
+    description: "",
+    montant: "",
+    type: "Revenu" as "Revenu" | "Dépense",
+    categorie: "",
+    compte: "",
+    numeroCheque: "",
+  });
+
+  // --- Security & Delete States
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authPassword, setAuthPassword] = useState("");
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [transactionToDelete, setTransactionToDelete] = useState<string | null>(null);
+
+  const itemsPerPage = 8;
+
+  // --- Handlers & Logic
+
+  const handleResetFilters = () => {
+    setSearchTerm("");
+    setFilterCompte("");
+    setFilterCategorie("");
+    setFilterMonth("");
+    setFilterYear("");
+    setFilterType("");
+    setCurrentPage(1);
+  };
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      if (sortOrder === null) {
+        setSortOrder("asc");
+      } else if (sortOrder === "asc") {
+        setSortOrder("desc");
+      } else {
+        setSortOrder(null);
+        setSortField(null);
+      }
+    } else {
+      setSortField(field);
+      setSortOrder("asc");
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleTypeChange = (newType: "Revenu" | "Dépense") => {
+    setFormData({
+      ...formData,
+      type: newType,
+      categorie: "", // Reset categorie on type change
+      compte: "", // Reset compte on type change
+      numeroCheque: "",
+    });
+  };
+
+  const getSortedTransactions = () => {
+    let sorted = [...transactions]; // Utilisation de l'état 'transactions'
+    
+    // Si pas de tri, trier par date descendante par défaut
+    if (!sortField) {
+        sorted.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        return sorted;
+    }
+
+    if (sortField && sortOrder) {
+      sorted.sort((a, b) => {
+        let aValue: any;
+        let bValue: any;
+
+        if (sortField === "date") {
+          aValue = new Date(a.date).getTime();
+          bValue = new Date(b.date).getTime();
+        } else if (sortField === "montant") {
+          aValue = a.montant;
+          bValue = b.montant;
+        } else if (sortField === "description") {
+          aValue = a.description.toLowerCase();
+          bValue = b.description.toLowerCase(); // Correction: b.description
+        }
+
+        if (sortOrder === "asc") {
+          return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+        } else {
+          return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
+        }
+      });
+    }
+
+    return sorted;
+  };
+
+  const filteredTransactions = useMemo(() => {
+    return getSortedTransactions().filter((t) => {
+      const matchSearch = t.description.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchCompte = filterCompte === "" || t.compte === filterCompte;
+      const matchCategorie = filterCategorie === "" || t.categorie === filterCategorie;
+      const matchType = filterType === "" || t.type === filterType;
+
+      const transactionDate = new Date(t.date);
+      const matchMonth = filterMonth === "" || transactionDate.getMonth() + 1 === parseInt(filterMonth);
+      const matchYear = filterYear === "" || transactionDate.getFullYear() === parseInt(filterYear);
+
+      return matchSearch && matchCompte && matchCategorie && matchType && matchMonth && matchYear;
+    });
+  }, [searchTerm, filterCompte, filterCategorie, filterType, filterMonth, filterYear, sortField, sortOrder, transactions]); // Dépendance à 'transactions' pour le re-calcul
+
+  const totalMontant = useMemo(() => {
+    return filteredTransactions.reduce((sum, t) => sum + t.montant, 0);
+  }, [filteredTransactions]);
+
+  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedTransactions = filteredTransactions.slice(startIndex, startIndex + itemsPerPage);
+
+  const availableCategories = categoriesData.filter(
+    (cat) => cat.type === formData.type && cat.statut === "actif"
+  );
+
+  const montantNumber = parseFloat(formData.montant) || 0;
+  const isCaisseDisabled = formData.type === "Dépense" && montantNumber > soldeCaisse;
+  const showNumeroCheque = formData.type === "Dépense" && formData.compte === "Banque A";
+
+
+  // --- Security & Modify Logic
+
+  const startModify = (transaction: Transaction) => {
+    setSelectedTransactionToModify(transaction);
+    setAuthPassword("");
+    setIsAuthModalOpen(true);
+  };
+
+  const handleAuthSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (authPassword === SECRET_PASSWORD) {
+      showToast("Mot de passe correct. Ouverture du modal de modification.", "success");
+      setIsAuthModalOpen(false);
+
+      if (selectedTransactionToModify) {
+        // Préremplir le formulaire avec les données de la transaction
+        const montantAbsolu = Math.abs(selectedTransactionToModify.montant).toString();
+        setFormData({
+          id: selectedTransactionToModify.id,
+          date: selectedTransactionToModify.date,
+          description: selectedTransactionToModify.description,
+          montant: montantAbsolu,
+          type: selectedTransactionToModify.type,
+          categorie: selectedTransactionToModify.categorie,
+          compte: selectedTransactionToModify.compte,
+          numeroCheque: "", // Dans une vraie application, cela viendrait de la transaction
+        });
+        setIsModifyModalOpen(true);
+      }
+    } else {
+      showToast("Mot de passe incorrect.", "error");
+      setAuthPassword("");
+    }
+  };
+
+  const handleModifyTransaction = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (showNumeroCheque && !formData.numeroCheque) {
+      showToast("Le numéro de chèque est obligatoire pour un paiement par banque", "warning");
+      return;
+    }
+
+    // Mise à jour de l'état `transactions` au lieu du tableau global
+    setTransactions(prevTransactions => {
+        const index = prevTransactions.findIndex(t => t.id === formData.id);
+
+        if (index !== -1) {
+            const montantFinal = formData.type === "Revenu" ? montantNumber : -montantNumber;
+
+            const updatedTransaction = {
+                ...prevTransactions[index],
+                date: formData.date,
+                description: formData.description,
+                montant: montantFinal,
+                montantAffiche: montantFinal >= 0 ? `+${montantNumber}€` : `-${montantNumber}€`,
+                type: formData.type,
+                categorie: formData.categorie,
+                compte: formData.compte,
+            };
+
+            const newTransactions = [...prevTransactions];
+            newTransactions[index] = updatedTransaction;
+            return newTransactions;
+        }
+        return prevTransactions;
+    });
+
+    showToast("Transaction modifiée avec succès", "success");
+    setIsModifyModalOpen(false);
+    setSelectedTransactionToModify(null);
+    setFormData({
+      id: "", date: new Date().toISOString().substring(0, 10), description: "", montant: "", type: "Revenu", categorie: "", compte: "", numeroCheque: "",
+    });
+  };
+
+  // --- Delete Logic
+
+  const startDelete = (id: string) => {
+    setTransactionToDelete(id);
+    setIsDeleteModalOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (transactionToDelete) {
+        // Mise à jour de l'état `transactions` au lieu du tableau global
+        setTransactions(prevTransactions => {
+            return prevTransactions.filter(t => t.id !== transactionToDelete);
+        });
+
+      showToast(`Transaction ${transactionToDelete} supprimée.`, "error");
+      setIsDeleteModalOpen(false);
+      setTransactionToDelete(null);
+    }
+  };
+
+  // --- Add Logic
+
+  const handleAddTransaction = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (showNumeroCheque && !formData.numeroCheque) {
+      showToast("Le numéro de chèque est obligatoire pour un paiement par banque", "warning");
+      return;
+    }
+
+    if (montantNumber <= 0) {
+      showToast("Le montant doit être supérieur à zéro", "warning");
+      return;
+    }
+
+    const newTransaction: Transaction = {
+      // Génération d'un ID unique simple (ajuster pour votre API)
+      id: (transactions.length > 0 ? (parseInt(transactions[transactions.length - 1].id) + 1).toString() : "1"), 
+      date: formData.date,
+      description: formData.description,
+      montant: formData.type === "Revenu" ? montantNumber : -montantNumber,
+      montantAffiche: formData.type === "Revenu" ? `+${montantNumber}€` : `-${montantNumber}€`,
+      type: formData.type,
+      categorie: formData.categorie,
+      compte: formData.compte,
+    };
+
+    // Mise à jour de l'état `transactions` au lieu du tableau global
+    setTransactions(prevTransactions => [...prevTransactions, newTransaction]);
+
+    showToast("Transaction ajoutée avec succès", "success");
+    setIsAddModalOpen(false);
+    setFormData({
+      id: "", date: new Date().toISOString().substring(0, 10), description: "", montant: "", type: "Revenu", categorie: "", compte: "", numeroCheque: "",
+    });
+  };
+
+  const handleLogout = () => {
+    showToast("Déconnexion réussie", "success");
+    // Navigation immédiate pour éviter l'erreur de composant non monté
+    router.push("/connexion"); 
+  };
+
+  if (isLoading) {
+    return <LoadingScreen />;
+  }
 
 
   return (
@@ -843,7 +771,7 @@ export default function TransactionsPage() {
               <select
                 value={filterMonth}
                 onChange={(e) => setFilterMonth(e.target.value)}
-                className="bg-transparent text-sm outline-none"
+                className="bg-transparent cursor-pointer text-sm outline-none"
               >
                 {months.map((month) => (
                   <option key={month.value} value={month.value}>
@@ -858,7 +786,7 @@ export default function TransactionsPage() {
               <select
                 value={filterYear}
                 onChange={(e) => setFilterYear(e.target.value)}
-                className="bg-transparent text-sm outline-none"
+                className="bg-transparent cursor-pointer text-sm outline-none"
               >
                 <option value="">Toutes les années</option>
                 {years.slice(1).map((year) => (
@@ -874,7 +802,7 @@ export default function TransactionsPage() {
               <select
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value as "" | "Revenu" | "Dépense")}
-                className="bg-transparent text-sm outline-none"
+                className="bg-transparent cursor-pointer text-sm outline-none"
               >
                 <option value="">Tous les types</option>
                 <option value="Revenu">Recettes</option>
@@ -887,7 +815,7 @@ export default function TransactionsPage() {
               <select
                 value={filterCompte}
                 onChange={(e) => setFilterCompte(e.target.value)}
-                className="bg-transparent text-sm outline-none"
+                className="bg-transparent cursor-pointer text-sm outline-none"
               >
                 <option value="">Tous les comptes</option>
                 <option value="Caisse">Caisse</option>
@@ -900,7 +828,7 @@ export default function TransactionsPage() {
               <select
                 value={filterCategorie}
                 onChange={(e) => setFilterCategorie(e.target.value)}
-                className="bg-transparent text-sm outline-none"
+                className="bg-transparent cursor-pointer text-sm outline-none"
               >
                 <option value="">Toutes les catégories</option>
                 {categoriesData.map((cat) => (
@@ -912,7 +840,7 @@ export default function TransactionsPage() {
             {/* Reset Filter Button */}
             <button
               onClick={handleResetFilters}
-              className="flex items-center gap-2 rounded-full border border-black/10 bg-zinc-50 px-4 py-2.5 text-sm font-semibold text-black/70 transition hover:bg-zinc-100"
+              className="flex items-center gap-2 cursor-pointer rounded-full border border-black/10 bg-zinc-50 px-4 py-2.5 text-sm font-semibold text-black/70 transition hover:bg-zinc-100"
             >
               <RefreshIcon />
               <span>Réinitialiser</span>
@@ -1006,7 +934,7 @@ export default function TransactionsPage() {
                           transaction.montant > 0 ? "text-emerald-600" : "text-red-600"
                         }`}
                       >
-                        {transaction.montantAffiche || transaction.montant}
+                        {transaction.montantAffiche || transaction.montant.toFixed(2) + '€'}
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -1083,6 +1011,14 @@ export default function TransactionsPage() {
             onSubmit={handleAddTransaction}
             title="Nouvelle Transaction"
             onClose={() => setIsAddModalOpen(false)}
+            formData={formData}
+            handleInputChange={handleInputChange}
+            handleTypeChange={handleTypeChange}
+            availableCategories={availableCategories}
+            isCaisseDisabled={isCaisseDisabled}
+            showNumeroCheque={showNumeroCheque}
+            soldeCaisse={soldeCaisse}
+            soldeBanque={soldeBanque}
           />
         )}
 
@@ -1132,6 +1068,14 @@ export default function TransactionsPage() {
             title={`Modifier Transaction #${formData.id}`}
             onClose={() => setIsModifyModalOpen(false)}
             isModification={true}
+            formData={formData}
+            handleInputChange={handleInputChange}
+            handleTypeChange={handleTypeChange}
+            availableCategories={availableCategories}
+            isCaisseDisabled={isCaisseDisabled}
+            showNumeroCheque={showNumeroCheque}
+            soldeCaisse={soldeCaisse}
+            soldeBanque={soldeBanque}
           />
         )}
 

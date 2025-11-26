@@ -1,11 +1,10 @@
-
 "use client";
 
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactElement } from "react";
-import { useToast } from "@/components/ToastContainer"; // Assurez-vous du chemin
+import { useToast } from "@/components/ToastContainer"; // Rétabli: Utilisation de votre ToastContainer
 import { LoadingScreen } from "@/components/LoadingScreen"; // Assurez-vous du chemin
 import { useLoading } from "@/hooks/useLoading"; // Assurez-vous du chemin
 
@@ -13,8 +12,9 @@ import { useLoading } from "@/hooks/useLoading"; // Assurez-vous du chemin
 // CONFIG & TYPES
 // ====================================================================
 
-const SECRET_PASSWORD = "1234"; // Simulation mot de passe
-const ITEMS_PER_PAGE = 10; // Constante pour la pagination
+// Constante pour la pagination
+const ITEMS_PER_PAGE = 10; 
+type PreferenceItem = { label: string; icon: () => ReactElement };
 
 type BankTransaction = {
   id: string;
@@ -27,7 +27,21 @@ type BankTransaction = {
 
 type NavItem = { label: string; icon: () => ReactElement; href: string };
 
-// Données Mockées (Simulées)
+
+// ====================================================================
+// API DATA SIMULATION (À REMPLACER PAR VOTRE FETCH/HOOK API)
+// ====================================================================
+
+/**
+ * ⚠️ IMPORTANT : Remplacez tout le bloc ci-dessous 
+ * par votre logique de récupération de données API.
+ */
+
+// 1. Clés Secrètes et Balances
+const SECRET_PASSWORD = "1234"; // Simulation mot de passe administrateur
+const CAISSE_BALANCE = 500000; // Montant simulé en caisse pour le bouton de dépôt (en EUR ou Ariary)
+
+// 2. Données Mockées (Simulées)
 let bankData: BankTransaction[] = [
   { id: "1", date: "2024-11-10", description: "Paiement Loyer Décembre", montant: -1200, type: "Retrait", numeroCheque: "CHQ-88541" },
   { id: "2", date: "2024-11-12", description: "Virement Dîmes Semaine 45", montant: 4500, type: "Dépôt" },
@@ -42,8 +56,12 @@ let bankData: BankTransaction[] = [
   { id: "11", date: "2024-09-28", description: "Don exceptionnel", montant: 1000, type: "Dépôt" },
 ];
 
-// Calcul du solde actuel (somme des montants)
+// 3. Calcul du solde actuel (à remplacer par la valeur renvoyée par l'API)
 const soldeBanqueActuel = bankData.reduce((acc, curr) => acc + curr.montant, 0); 
+
+// ====================================================================
+// FIN API DATA SIMULATION
+// ====================================================================
 
 const months = [
     { value: "", label: "Tous les mois" },
@@ -53,10 +71,13 @@ const months = [
     { value: "10", label: "Octobre" }, { value: "11", label: "Novembre" }, { value: "12", label: "Décembre" },
 ];
 const years = ["", "2024", "2023", "2022"];
+const preferenceItems: PreferenceItem[] = [
+    { label: "Paramètres", icon: SettingsIcon },
+    // { label: "Aide", icon: HelpIcon },
+  ];
 
 // ====================================================================
 // ICON COMPONENTS
-// (Réutilisées pour la concision)
 // ====================================================================
 
 function DashboardIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" stroke="none"><path d="M4 3h7v9H4zM13 3h7v5h-7zM13 10h7v11h-7zM4 14h7v7H4z" /></svg>; }
@@ -68,7 +89,14 @@ function UsersIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5" fill=
 function LogoutIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor"><path d="M10 3h10v18H10v-2h8V5h-8zm-1 6l-4 3 4 3v-2h7v-2H9z" /></svg>; }
 
 // Icons Utilitaires
-function IconChurch() { return <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3L2 12h3v8z" /></svg>; }
+function IconChurch() {
+    return (
+      <svg viewBox="0 0 24 24" className="h-8 w-8 text-white" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <path d="M12 2v6m-4-2 4-4 4 4M5 22v-7l7-5 7 5v7z" strokeLinecap="round" />
+      </svg>
+    );
+  }
+// function IconChurch() { return <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3L2 12h3v8z" /></svg>; }
 function SearchIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5 text-black/40" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /></svg>; }
 function PlusIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>; }
 function EditIcon() {
@@ -79,11 +107,19 @@ function EditIcon() {
       </svg>
     );
   }
+  function SettingsIcon() {
+    return (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
+        <path d="M12 15a3 3 0 110-6 3 3 0 010 6zm8.6-3.5l1.4 2.5-2.1 3.6-2.9-.3a7.1 7.1 0 01-1.6 1l-.5 2.8H9.1l-.5-2.8a7.1 7.1 0 01-1.6-1l-2.9.3-2.1-3.6 1.4-2.5a7.6 7.6 0 010-1l-1.4-2.5L4.1 4.4l2.9.3a7.1 7.1 0 011.6-1L9.1 1h5.8l.5 2.8a7.1 7.1 0 011.6 1l2.9-.3 2.1 3.6-1.4 2.5a7.6 7.6 0 010 1z"/>
+  </svg>
+  );
+  }
 // function EditIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5 text-black/60" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" /></svg>; }
 function CloseIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>; }
 function BankIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 21h18M5 21v-7l8-5 8 5v7M6 10l6-4 6 4" /></svg>; }
 function ArrowDownRightIcon() { return <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M7 7l10 10M17 7v10H7" /></svg>; }
 function ArrowUpRightIcon() { return <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M7 17L17 7M7 7h10v10" /></svg>; }
+// FIX: Correction de la syntaxe JSX pour l'icône CheckIcon
 function CheckIcon() { return <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /></svg>; }
 function CalendarIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5 text-black/60" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>; }
 function RefreshIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 0 0-9-9c-1.88 0-3.66.6-5.05 1.7L3 6M21 12h-4M3 12h4M6 18l-3-3h6l3 3m-9 0v-4" /></svg>; }
@@ -95,9 +131,9 @@ function EyeOffIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5" fill
 const navItems: NavItem[] = [
   { label: "Dashboard", icon: DashboardIcon, href: "/dashboard" },
   { label: "Transactions", icon: TransactionsIcon, href: "/transaction" },
-  { label: "Comptes", icon: AccountsIcon, href: "/comptes" },
+//   { label: "Comptes", icon: AccountsIcon, href: "/comptes" },
   { label: "Catégories", icon: CategoriesIcon, href: "/categorie" },
-  { label: "Rapports", icon: ReportsIcon, href: "/rapports" },
+//   { label: "Rapports", icon: ReportsIcon, href: "/rapports" },
   { label: "Transaction Bancaire", icon: UsersIcon, href: "/banque" },
 ];
 
@@ -105,7 +141,7 @@ const navItems: NavItem[] = [
 // SECURE SOLDE CARD COMPONENT
 // ====================================================================
 
-function SecureSoldeCard({ soldeActuel, showToast }: { soldeActuel: number, showToast: (message: string, type: 'success' | 'error' | 'warning') => void }) {
+function SecureSoldeCard({ soldeActuel, showToast }: { soldeActuel: number, showToast: (message: string, type: 'success' | 'error' | 'warning' | 'info') => void }) {
     const [showSolde, setShowSolde] = useState(false);
     const [soldeAuthModalOpen, setSoldeAuthModalOpen] = useState(false);
     const [soldeAuthPassword, setSoldeAuthPassword] = useState("");
@@ -229,7 +265,7 @@ function TotalFilterCard({ total, activeTab }: { total: number, activeTab: "retr
 }
 
 // ====================================================================
-// MODAL FORM (Déplacé ici pour éviter le problème de focus)
+// MODAL FORM (pour l'ajout/modification)
 // ====================================================================
 
 interface ModalFormProps {
@@ -240,15 +276,24 @@ interface ModalFormProps {
     setFormData: React.Dispatch<React.SetStateAction<Partial<BankTransaction>>>;
     isRetrait: boolean;
     isModification: boolean;
+    showToast: (message: string, type: 'success' | 'error' | 'warning' | 'info') => void; // Ajout du toast
 }
 
-const ModalForm: React.FC<ModalFormProps> = ({ title, onSubmit, onClose, formData, setFormData, isRetrait, isModification }) => {
+const ModalForm: React.FC<ModalFormProps> = ({ title, onSubmit, onClose, formData, setFormData, isRetrait, isModification, showToast }) => {
     
     const shouldShowCheque = isModification ? formData.type === "Retrait" : isRetrait;
+    const isNewDeposit = !isModification && !isRetrait; // C'est un nouveau dépôt
       
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData((prev) => ({ ...prev, [name]: value }));
+    };
+
+    // NOUVEAU: Handler pour pré-remplir avec le solde de caisse (UI/UX Amélioré)
+    const handleSetCaisseBalance = (e: React.MouseEvent<HTMLButtonElement>) => {
+        e.preventDefault();
+        setFormData((prev) => ({ ...prev, montant: CAISSE_BALANCE }));
+        showToast(`Montant Caisse (${CAISSE_BALANCE.toLocaleString('fr-FR')} €) pré-rempli.`, "info");
     };
 
     return (
@@ -264,9 +309,36 @@ const ModalForm: React.FC<ModalFormProps> = ({ title, onSubmit, onClose, formDat
                             <label className="mb-1 block text-sm font-semibold">Date</label>
                             <input type="date" name="date" required value={formData.date || new Date().toISOString().substring(0, 10)} onChange={handleInputChange} className="w-full rounded-xl border border-black/10 bg-zinc-50 p-3 text-sm" />
                         </div>
+                        
+                        {/* Champ Montant avec Bouton Caisse (UI/UX amélioré) */}
                         <div>
                             <label className="mb-1 block text-sm font-semibold">Montant (€)</label>
-                            <input type="number" name="montant" required min="0.01" step="0.01" value={formData.montant || ""} onChange={handleInputChange} className="w-full rounded-xl border border-black/10 bg-zinc-50 p-3 text-sm" />
+                            <div className="relative">
+                                <input 
+                                    type="number" 
+                                    name="montant" 
+                                    required min="0.01" 
+                                    step="0.01" 
+                                    value={formData.montant || ""} 
+                                    onChange={handleInputChange} 
+                                    // Ajuster le padding-right (pr) pour faire de la place au bouton
+                                    className="w-full rounded-xl border border-black/10 bg-zinc-50 p-3 text-sm pr-[150px] focus:border-blue-500" 
+                                />
+                                {/* Bouton Caisse visible seulement pour l'ajout d'un Dépôt */}
+                                {isNewDeposit && (
+                                    <button
+                                        type="button"
+                                        onClick={handleSetCaisseBalance}
+                                        disabled={Number(formData.montant) === CAISSE_BALANCE}
+                                        // Style du bouton amélioré : couleur Ambre, position absolue
+                                        className="absolute right-1 top-1 bottom-1 flex items-center rounded-xl bg-amber-500 px-3 py-1.5 text-xs font-bold text-white shadow-md transition hover:bg-amber-600 hover:shadow-lg disabled:bg-zinc-300 disabled:shadow-none disabled:cursor-not-allowed"
+                                        title={`Remplir avec le Solde de Caisse: ${CAISSE_BALANCE.toLocaleString('fr-FR')} €`}
+                                    >
+                                        CAISSE
+                                        <span className="ml-1 text-[10px] opacity-80">({CAISSE_BALANCE.toLocaleString('fr-FR')})</span>
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
                     
@@ -313,11 +385,13 @@ const ModalForm: React.FC<ModalFormProps> = ({ title, onSubmit, onClose, formDat
 export default function BanquePage() {
   const pathname = usePathname();
   const router = useRouter();
-  const { showToast } = useToast();
+  const { showToast } = useToast(); // UTILISATION DU HOOK useToast
+
   const isLoading = useLoading(1000);
 
   // States
   const [activeTab, setActiveTab] = useState<"retrait" | "depot">("retrait");
+  // ⚠️ NOTE API: dataVersion peut servir à re-déclencher un fetch de l'API si les opérations (Ajout/Modif) étaient gérées par l'API
   const [dataVersion, setDataVersion] = useState(0); // Trigger refresh
   const [currentPage, setCurrentPage] = useState(1);
   
@@ -401,6 +475,7 @@ export default function BanquePage() {
         return;
     }
 
+    // ⚠️ LOGIQUE API : Remplacez par votre appel PUT/PATCH à l'API
     const index = bankData.findIndex(d => d.id === formData.id);
     if(index !== -1 && formData.id) {
         bankData[index] = { 
@@ -411,7 +486,7 @@ export default function BanquePage() {
         };
         showToast("Modification enregistrée", "success");
         setIsModifyModalOpen(false);
-        setDataVersion(v => v + 1);
+        setDataVersion(v => v + 1); // Déclencheur de rafraîchissement
         setCurrentPage(1);
     }
   };
@@ -430,6 +505,7 @@ export default function BanquePage() {
         return;
       }
 
+      // ⚠️ LOGIQUE API : Remplacez par votre appel POST à l'API
       const newTransaction: BankTransaction = {
           id: Date.now().toString(),
           date: formData.date || new Date().toISOString().substring(0, 10),
@@ -438,10 +514,10 @@ export default function BanquePage() {
           type: type,
           numeroCheque: type === "Retrait" ? formData.numeroCheque : undefined
       };
-      bankData.unshift(newTransaction); 
+      bankData.unshift(newTransaction); // Ajout local simulé
       showToast(`${type} ajouté avec succès.`, "success");
       setIsAddModalOpen(false);
-      setDataVersion(v => v + 1);
+      setDataVersion(v => v + 1); // Déclencheur de rafraîchissement
       setCurrentPage(1);
   };
 
@@ -476,9 +552,8 @@ export default function BanquePage() {
     return data;
   }, [activeTab, dataVersion, searchTerm, filterMonth, filterYear]);
 
-  // Calcul du total des éléments filtrés (pour la nouvelle carte)
+  // Calcul du total des éléments filtrés 
   const totalFilteredAmount = useMemo(() => {
-    // Calculer la somme des montants. Puisque le filtre est par type, nous prenons la valeur absolue.
     return filteredData.reduce((sum, item) => sum + Math.abs(item.montant), 0);
   }, [filteredData]);
 
@@ -512,10 +587,32 @@ export default function BanquePage() {
           </nav>
         </div>
         <div className="space-y-4 border-t border-white/10 pt-6">
+          <p className="text-xs uppercase tracking-[0.4em] text-white/50">
+            Préférences
+          </p>
+          <ul className="space-y-2">
+            {preferenceItems.map(({ label, icon: Icon }) => (
+              <li key={label}>
+                <button className="flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-sm text-white/70 transition hover:bg-white/10">
+                  <Icon />
+                  <span>{label}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          <button 
+            onClick={handleLogout}
+            className="flex w-full items-center gap-3 rounded-2xl border border-white/20 px-3 py-2 text-sm text-white transition hover:bg-white hover:text-black"
+          >
+            <LogoutIcon />
+            <span>Déconnexion</span>
+          </button>
+        </div>
+        {/* <div className="space-y-4 border-t border-white/10 pt-6">
             <button onClick={handleLogout} className="flex w-full items-center gap-3 rounded-2xl border border-white/20 px-3 py-2 text-sm text-white transition hover:bg-white hover:text-black">
                 <LogoutIcon /><span>Déconnexion</span>
             </button>
-        </div>
+        </div> */}
       </aside>
 
       {/* MAIN CONTENT */}
@@ -594,14 +691,14 @@ export default function BanquePage() {
             <div className="flex rounded-full border border-black/10 bg-white p-1 shadow-sm">
                 <button 
                     onClick={() => { setActiveTab("retrait"); setCurrentPage(1); }}
-                    className={`flex items-center gap-2 rounded-full px-6 py-2.5 text-sm font-semibold transition ${activeTab === "retrait" ? "bg-red-50 text-red-600 ring-1 ring-red-200" : "text-black/60 hover:bg-zinc-50"}`}
+                    className={`flex items-center gap-2 rounded-full px-6 py-2.5 cursor-pointer text-sm font-semibold transition ${activeTab === "retrait" ? "bg-red-50 text-red-600 ring-1 ring-red-200" : "text-black/60 hover:bg-zinc-50"}`}
                 >
                     <ArrowDownRightIcon />
                     Retraits (Chèques)
                 </button>
                 <button 
                     onClick={() => { setActiveTab("depot"); setCurrentPage(1); }}
-                    className={`flex items-center gap-2 rounded-full px-6 py-2.5 text-sm font-semibold transition ${activeTab === "depot" ? "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200" : "text-black/60 hover:bg-zinc-50"}`}
+                    className={`flex cursor-pointer items-center gap-2 rounded-full px-6 py-2.5 text-sm font-semibold transition ${activeTab === "depot" ? "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200" : "text-black/60 hover:bg-zinc-50"}`}
                 >
                     <ArrowUpRightIcon />
                     Dépôts
@@ -751,6 +848,7 @@ export default function BanquePage() {
             setFormData={setFormData}
             isRetrait={activeTab === "retrait"}
             isModification={false}
+            showToast={showToast} // Passage du hook
           />
       )}
 
@@ -764,8 +862,11 @@ export default function BanquePage() {
             setFormData={setFormData}
             isRetrait={formData.type === "Retrait"}
             isModification={true}
+            showToast={showToast} // Passage du hook
           />
       )}
+      
+      {/* Suppression du rendu de Toast personnalisé: il est maintenant géré par ToastContainer.tsx */}
 
     </div>
   );

@@ -7,31 +7,47 @@ import { useToast } from "@/components/ToastContainer";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { useLoading } from "@/hooks/useLoading";
 
+// ====================================================================
+// CONFIG & TYPES
+// ====================================================================
+
 type NavItem = { label: string; icon: () => ReactElement; href: string };
 type PreferenceItem = { label: string; icon: () => ReactElement };
 type TrendDirection = "up" | "down";
+
+// Structure de données pour les cartes financières
 type FinancialCard = {
   title: string;
-  amount: string;
+  amount: string; // Laissé en string pour supporter les formats (Ariary, $ etc.)
   variation: string;
   trend: TrendDirection;
 };
 
-const navItems: NavItem[] = [
-  { label: "Dashboard", icon: DashboardIcon, href: "/dashboard" },
-  { label: "Transactions", icon: TransactionsIcon, href: "/transaction" },
-  { label: "Comptes", icon: AccountsIcon, href: "/comptes" },
-  { label: "Catégories", icon: CategoriesIcon, href: "/categorie" },
-  { label: "Rapports", icon: ReportsIcon, href: "/rapports" },
-  { label: "Transaction Bancaire", icon: UsersIcon, href: "/banque" },
-];
+// Structure de données pour la répartition des revenus
+type RevenueBreakdown = { label: string; value: number; color: string };
 
-const preferenceItems: PreferenceItem[] = [
-  { label: "Paramètres", icon: SettingsIcon },
-  { label: "Aide", icon: HelpIcon },
-];
+// Structure de données pour les transactions
+type Transaction = { date: string; description: string; montant: string };
 
-// Variables pour API
+// Structure de données pour les comptes
+type Account = { name: string; solde: string };
+
+// Structure de données pour le graphique de tendances
+type TrendData = {
+  months: string[];
+  revenues: number[];
+  expenses: number[];
+};
+
+// ====================================================================
+// API DATA SIMULATION (À REMPLACER PAR VOTRE FETCH/HOOK API)
+// ====================================================================
+
+/**
+ * ⚠️ IMPORTANT : Remplacez tout le bloc ci-dessous 
+ * par votre logique de récupération de données API (e.g., const { cards, breakdown, ... } = useDashboardData();).
+ */
+
 const financialCards: FinancialCard[] = [
   {
     title: "Solde du mois",
@@ -53,13 +69,13 @@ const financialCards: FinancialCard[] = [
   },
   {
     title: "Solde en banque",
-    amount: "",
+    amount: "12.500.000 Ariary", // Ajout d'une valeur pour l'exemple
     variation: "+18%",
     trend: "up",
   },
 ];
 
-const revenueBreakdown: { label: string; value: number; color: string }[] = [
+const revenueBreakdown: RevenueBreakdown[] = [
   { label: "Dîmes", value: 45, color: "#3b82f6" },
   { label: "Offrandes", value: 30, color: "#16a34a" },
   { label: "Dons", value: 15, color: "#eab308" },
@@ -67,24 +83,45 @@ const revenueBreakdown: { label: string; value: number; color: string }[] = [
   { label: "Autres", value: 3, color: "#ef4444" },
 ];
 
-const transactions = [
+const transactions: Transaction[] = [
   { date: "15 Jan", description: "Offrande spéciale", montant: "+$2.450" },
   { date: "13 Jan", description: "Paiement facture", montant: "-$600" },
   { date: "10 Jan", description: "Dîme collective", montant: "+$4.120" },
 ];
 
-const accounts = [
+const accounts: Account[] = [
   { name: "Compte principal", solde: "$98.200" },
   { name: "Fonds missionnaires", solde: "$27.560" },
   { name: "Épargne projets", solde: "$12.870" },
 ];
 
-// Données pour le graphique de tendances
-const trendData = {
+const trendData: TrendData = {
   months: ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul"],
   revenues: [160, 130, 120, 80, 90, 50, 70],
   expenses: [120, 110, 140, 130, 150, 120, 100],
 };
+
+// ====================================================================
+// FIN API DATA SIMULATION
+// ====================================================================
+
+// Les constantes de navigation ne sont pas considérées comme des "fake data" d'API, 
+// mais je les laisse ici pour que le code reste complet.
+const navItems: NavItem[] = [
+  { label: "Dashboard", icon: DashboardIcon, href: "/dashboard" },
+  { label: "Transactions", icon: TransactionsIcon, href: "/transaction" },
+  // { label: "Comptes", icon: AccountsIcon, href: "/comptes" },
+  { label: "Catégories", icon: CategoriesIcon, href: "/categorie" },
+  // { label: "Rapports", icon: ReportsIcon, href: "/rapports" },
+  { label: "Transaction Bancaire", icon: UsersIcon, href: "/banque" },
+];
+
+const preferenceItems: PreferenceItem[] = [
+  { label: "Paramètres", icon: SettingsIcon },
+  // { label: "Aide", icon: HelpIcon },
+];
+
+// ... (Le reste des composants et icônes suit)
 
 export default function DashboardPage() {
   const pathname = usePathname();
