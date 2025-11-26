@@ -1,55 +1,55 @@
-"use client";
+// "use client";
 
-import { createContext, useContext, useState, ReactNode } from "react";
-import Toast from "../components/ToastContainer";
+// import { createContext, useContext, useState, ReactNode } from "react";
+// import Toast from "../components/ToastContainer";
 
-type ToastType = "success" | "error" | "info";
+// type ToastType = "success" | "error" | "info";
 
-interface ToastData {
-  id: string;
-  message: string;
-  type: ToastType;
-}
+// interface ToastData {
+//   id: string;
+//   message: string;
+//   type: ToastType;
+// }
 
-interface ToastContextType {
-  showToast: (message: string, type: ToastType) => void;
-}
+// interface ToastContextType {
+//   showToast: (message: string, type: ToastType) => void;
+// }
 
-const ToastContext = createContext<ToastContextType | undefined>(undefined);
+// const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
-export function ToastProvider({ children }: { children: ReactNode }) {
-  const [toasts, setToasts] = useState<ToastData[]>([]);
+// export function ToastProvider({ children }: { children: ReactNode }) {
+//   const [toasts, setToasts] = useState<ToastData[]>([]);
 
-  const showToast = (message: string, type: ToastType) => {
-    const id = Math.random().toString(36).substr(2, 9);
-    setToasts((prev) => [...prev, { id, message, type }]);
-  };
+//   const showToast = (message: string, type: ToastType) => {
+//     const id = Math.random().toString(36).substr(2, 9);
+//     setToasts((prev) => [...prev, { id, message, type }]);
+//   };
 
-  const removeToast = (id: string) => {
-    setToasts((prev) => prev.filter((toast) => toast.id !== id));
-  };
+//   const removeToast = (id: string) => {
+//     setToasts((prev) => prev.filter((toast) => toast.id !== id));
+//   };
 
-  return (
-    <ToastContext.Provider value={{ showToast }}>
-      {children}
-      <div className="fixed right-6 top-6 z-50 flex flex-col">
-        {toasts.map((toast) => (
-          <Toast
-            key={toast.id}
-            message={toast.message}
-            type={toast.type}
-            onClose={() => removeToast(toast.id)}
-          />
-        ))}
-      </div>
-    </ToastContext.Provider>
-  );
-}
+//   return (
+//     <ToastContext.Provider value={{ showToast }}>
+//       {children}
+//       <div className="fixed right-6 top-6 z-50 flex flex-col">
+//         {toasts.map((toast) => (
+//           <Toast
+//             key={toast.id}
+//             message={toast.message}
+//             type={toast.type}
+//             onClose={() => removeToast(toast.id)}
+//           />
+//         ))}
+//       </div>
+//     </ToastContext.Provider>
+//   );
+// }
 
-export function useToast() {
-  const context = useContext(ToastContext);
-  if (!context) {
-    throw new Error("useToast must be used within ToastProvider");
-  }
-  return context;
-}
+// export function useToast() {
+//   const context = useContext(ToastContext);
+//   if (!context) {
+//     throw new Error("useToast must be used within ToastProvider");
+//   }
+//   return context;
+// }
