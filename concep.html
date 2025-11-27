@@ -1,0 +1,211 @@
+<svg viewBox="0 0 1400 1000" xmlns="http://www.w3.org/2000/svg">
+    <!-- Définition des styles -->
+    <defs>
+      <style>
+        .table-header { fill: #1e293b; }
+        .table-body { fill: #f8fafc; stroke: #cbd5e1; stroke-width: 2; }
+        .pk { fill: #fbbf24; font-weight: bold; }
+        .fk { fill: #3b82f6; }
+        .field { fill: #334155; font-size: 13px; }
+        .table-name { fill: white; font-size: 16px; font-weight: bold; }
+        .relation { stroke: #6366f1; stroke-width: 2; fill: none; }
+        .relation-label { fill: #6366f1; font-size: 11px; font-style: italic; }
+      </style>
+    </defs>
+  
+    <!-- Table USER -->
+    <g id="user-table" transform="translate(50, 50)">
+      <rect class="table-header" width="280" height="40" rx="5"/>
+      <text class="table-name" x="140" y="25" text-anchor="middle">USER</text>
+      <rect class="table-body" y="40" width="280" height="160" rx="5"/>
+      <text class="pk field" x="10" y="65">🔑 id</text>
+      <text class="field" x="150" y="65">INTEGER (PK, AUTO)</text>
+      <text class="field" x="10" y="90">email</text>
+      <text class="field" x="150" y="90">VARCHAR(255) UNIQUE</text>
+      <text class="field" x="10" y="115">mot_de_passe</text>
+      <text class="field" x="150" y="115">VARCHAR(255)</text>
+      <text class="field" x="10" y="140">nom</text>
+      <text class="field" x="150" y="140">VARCHAR(100)</text>
+      <text class="field" x="10" y="165">created_at</text>
+      <text class="field" x="150" y="165">TIMESTAMP</text>
+      <text class="field" x="10" y="190">updated_at</text>
+      <text class="field" x="150" y="190">TIMESTAMP</text>
+    </g>
+  
+    <!-- Table CATEGORIE -->
+    <g id="categorie-table" transform="translate(450, 50)">
+      <rect class="table-header" width="300" height="40" rx="5"/>
+      <text class="table-name" x="150" y="25" text-anchor="middle">CATEGORIE</text>
+      <rect class="table-body" y="40" width="300" height="185" rx="5"/>
+      <text class="pk field" x="10" y="65">🔑 id</text>
+      <text class="field" x="170" y="65">INTEGER (PK, AUTO)</text>
+      <text class="field" x="10" y="90">nom</text>
+      <text class="field" x="170" y="90">VARCHAR(100)</text>
+      <text class="field" x="10" y="115">code_budgetaire</text>
+      <text class="field" x="170" y="115">VARCHAR(20) UNIQUE</text>
+      <text class="field" x="10" y="140">type</text>
+      <text class="field" x="170" y="140">ENUM('RECETTE','DEPENSE')</text>
+      <text class="field" x="10" y="165">statut</text>
+      <text class="field" x="170" y="165">ENUM('ACTIF','INACTIF')</text>
+      <text class="field" x="10" y="190">created_at</text>
+      <text class="field" x="170" y="190">TIMESTAMP</text>
+      <text class="field" x="10" y="215">updated_at</text>
+      <text class="field" x="170" y="215">TIMESTAMP</text>
+    </g>
+  
+    <!-- Table COMPTE -->
+    <g id="compte-table" transform="translate(900, 50)">
+      <rect class="table-header" width="280" height="40" rx="5"/>
+      <text class="table-name" x="140" y="25" text-anchor="middle">COMPTE</text>
+      <rect class="table-body" y="40" width="280" height="160" rx="5"/>
+      <text class="pk field" x="10" y="65">🔑 id</text>
+      <text class="field" x="150" y="65">INTEGER (PK, AUTO)</text>
+      <text class="field" x="10" y="90">nom</text>
+      <text class="field" x="150" y="90">VARCHAR(50) UNIQUE</text>
+      <text class="field" x="10" y="115">type</text>
+      <text class="field" x="150" y="115">ENUM('CAISSE','BANQUE')</text>
+      <text class="field" x="10" y="140">solde_actuel</text>
+      <text class="field" x="150" y="140">DECIMAL(15,2)</text>
+      <text class="field" x="10" y="165">created_at</text>
+      <text class="field" x="150" y="165">TIMESTAMP</text>
+      <text class="field" x="10" y="190">updated_at</text>
+      <text class="field" x="150" y="190">TIMESTAMP</text>
+    </g>
+  
+    <!-- Table TRANSACTION -->
+    <g id="transaction-table" transform="translate(450, 350)">
+      <rect class="table-header" width="320" height="40" rx="5"/>
+      <text class="table-name" x="160" y="25" text-anchor="middle">TRANSACTION</text>
+      <rect class="table-body" y="40" width="320" height="260" rx="5"/>
+      <text class="pk field" x="10" y="65">🔑 id</text>
+      <text class="field" x="170" y="65">INTEGER (PK, AUTO)</text>
+      <text class="fk field" x="10" y="90">🔗 categorie_id</text>
+      <text class="field" x="170" y="90">INTEGER (FK)</text>
+      <text class="fk field" x="10" y="115">🔗 compte_id</text>
+      <text class="field" x="170" y="115">INTEGER (FK)</text>
+      <text class="field" x="10" y="140">date_transaction</text>
+      <text class="field" x="170" y="140">DATE</text>
+      <text class="field" x="10" y="165">description</text>
+      <text class="field" x="170" y="165">TEXT</text>
+      <text class="field" x="10" y="190">montant</text>
+      <text class="field" x="170" y="190">DECIMAL(15,2)</text>
+      <text class="field" x="10" y="215">type</text>
+      <text class="field" x="170" y="215">ENUM('RECETTE','DEPENSE')</text>
+      <text class="field" x="10" y="240">created_at</text>
+      <text class="field" x="170" y="240">TIMESTAMP</text>
+      <text class="field" x="10" y="265">updated_at</text>
+      <text class="field" x="170" y="265">TIMESTAMP</text>
+      <text class="fk field" x="10" y="290">🔗 created_by</text>
+      <text class="field" x="170" y="290">INTEGER (FK)</text>
+    </g>
+  
+    <!-- Table TRANSACTION_BANCAIRE -->
+    <g id="transaction-bancaire-table" transform="translate(900, 350)">
+      <rect class="table-header" width="320" height="40" rx="5"/>
+      <text class="table-name" x="160" y="25" text-anchor="middle">TRANSACTION_BANCAIRE</text>
+      <rect class="table-body" y="40" width="320" height="235" rx="5"/>
+      <text class="pk field" x="10" y="65">🔑 id</text>
+      <text class="field" x="170" y="65">INTEGER (PK, AUTO)</text>
+      <text class="fk field" x="10" y="90">🔗 compte_id</text>
+      <text class="field" x="170" y="90">INTEGER (FK)</text>
+      <text class="field" x="10" y="115">date_operation</text>
+      <text class="field" x="170" y="115">DATE</text>
+      <text class="field" x="10" y="140">description</text>
+      <text class="field" x="170" y="140">TEXT</text>
+      <text class="field" x="10" y="165">montant</text>
+      <text class="field" x="170" y="165">DECIMAL(15,2)</text>
+      <text class="field" x="10" y="190">type</text>
+      <text class="field" x="170" y="190">ENUM('RETRAIT','DEPOT')</text>
+      <text class="field" x="10" y="215">numero_cheque</text>
+      <text class="field" x="170" y="215">VARCHAR(50) NULL</text>
+      <text class="field" x="10" y="240">created_at</text>
+      <text class="field" x="170" y="240">TIMESTAMP</text>
+      <text class="field" x="10" y="265">updated_at</text>
+      <text class="field" x="170" y="265">TIMESTAMP</text>
+    </g>
+  
+    <!-- Table PARAMETRE -->
+    <g id="parametre-table" transform="translate(50, 350)">
+      <rect class="table-header" width="280" height="40" rx="5"/>
+      <text class="table-name" x="140" y="25" text-anchor="middle">PARAMETRE</text>
+      <rect class="table-body" y="40" width="280" height="135" rx="5"/>
+      <text class="pk field" x="10" y="65">🔑 id</text>
+      <text class="field" x="150" y="65">INTEGER (PK, AUTO)</text>
+      <text class="field" x="10" y="90">cle</text>
+      <text class="field" x="150" y="90">VARCHAR(50) UNIQUE</text>
+      <text class="field" x="10" y="115">valeur</text>
+      <text class="field" x="150" y="115">TEXT</text>
+      <text class="field" x="10" y="140">description</text>
+      <text class="field" x="150" y="140">TEXT NULL</text>
+      <text class="field" x="10" y="165">updated_at</text>
+      <text class="field" x="150" y="165">TIMESTAMP</text>
+    </g>
+  
+    <!-- Table AUDIT_LOG -->
+    <g id="audit-table" transform="translate(50, 650)">
+      <rect class="table-header" width="320" height="40" rx="5"/>
+      <text class="table-name" x="160" y="25" text-anchor="middle">AUDIT_LOG</text>
+      <rect class="table-body" y="40" width="320" height="185" rx="5"/>
+      <text class="pk field" x="10" y="65">🔑 id</text>
+      <text class="field" x="170" y="65">INTEGER (PK, AUTO)</text>
+      <text class="fk field" x="10" y="90">🔗 user_id</text>
+      <text class="field" x="170" y="90">INTEGER (FK)</text>
+      <text class="field" x="10" y="115">action</text>
+      <text class="field" x="170" y="115">VARCHAR(50)</text>
+      <text class="field" x="10" y="140">table_name</text>
+      <text class="field" x="170" y="140">VARCHAR(50)</text>
+      <text class="field" x="10" y="165">record_id</text>
+      <text class="field" x="170" y="165">INTEGER</text>
+      <text class="field" x="10" y="190">old_value</text>
+      <text class="field" x="170" y="190">JSON NULL</text>
+      <text class="field" x="10" y="215">new_value</text>
+      <text class="field" x="170" y="215">JSON NULL</text>
+      <text class="field" x="10" y="240">created_at</text>
+      <text class="field" x="170" y="240">TIMESTAMP</text>
+    </g>
+  
+    <!-- Relations -->
+    <!-- TRANSACTION -> CATEGORIE -->
+    <path class="relation" d="M 600 350 L 600 235" marker-end="url(#arrowhead)"/>
+    <text class="relation-label" x="610" y="290">N:1</text>
+    
+    <!-- TRANSACTION -> COMPTE -->
+    <path class="relation" d="M 770 480 L 900 200" marker-end="url(#arrowhead)"/>
+    <text class="relation-label" x="820" y="340">N:1</text>
+    
+    <!-- TRANSACTION -> USER -->
+    <path class="relation" d="M 450 480 L 330 200" marker-end="url(#arrowhead)"/>
+    <text class="relation-label" x="380" y="340">N:1</text>
+    
+    <!-- TRANSACTION_BANCAIRE -> COMPTE -->
+    <path class="relation" d="M 1060 350 L 1060 210" marker-end="url(#arrowhead)"/>
+    <text class="relation-label" x="1070" y="280">N:1</text>
+    
+    <!-- AUDIT_LOG -> USER -->
+    <path class="relation" d="M 190 650 L 190 210" marker-end="url(#arrowhead)"/>
+    <text class="relation-label" x="200" y="430">N:1</text>
+  
+    <!-- Marker pour les flèches -->
+    <defs>
+      <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+        <polygon points="0 0, 10 3, 0 6" fill="#6366f1"/>
+      </marker>
+    </defs>
+  
+    <!-- Légende -->
+    <g transform="translate(500, 720)">
+      <rect fill="#f1f5f9" stroke="#cbd5e1" stroke-width="2" width="400" height="220" rx="5"/>
+      <text fill="#1e293b" font-size="16" font-weight="bold" x="150" y="25">LÉGENDE & NOTES</text>
+      
+      <text class="pk field" x="10" y="55">🔑 PK = Clé Primaire</text>
+      <text class="fk field" x="10" y="75">🔗 FK = Clé Étrangère</text>
+      <text class="field" x="10" y="95">AUTO = Auto-incrémenté</text>
+      
+      <text fill="#334155" font-size="12" x="10" y="125">• Les montants sont POSITIFS pour les recettes</text>
+      <text fill="#334155" font-size="12" x="10" y="145">• Les montants sont NÉGATIFS pour les dépenses</text>
+      <text fill="#334155" font-size="12" x="10" y="165">• TRANSACTION_BANCAIRE : numéro_chèque</text>
+      <text fill="#334155" font-size="12" x="10" y="180">  obligatoire pour type='RETRAIT'</text>
+      <text fill="#334155" font-size="12" x="10" y="200">• PARAMETRE stocke : mot_de_passe_securite,</text>
+      <text fill="#334155" font-size="12" x="10" y="215">  devise, nom_eglise, etc.</text>
+    </g>
+  </svg>

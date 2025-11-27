@@ -1,0 +1,593 @@
+"use client";
+
+import { usePathname, useRouter } from "next/navigation";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useToast } from "@/components/ToastContainer";
+import { LoadingScreen } from "@/components/LoadingScreen";
+import { useLoading } from "@/hooks/useLoading";
+import { SearchIcon, EyeIcon, EyeOffIcon } from "@/components/Icons";
+
+// ====================================================================
+// CONFIG & TYPES
+// ====================================================================
+
+type TrendDirection = "up" | "down";
+
+// Structure de données pour les cartes financières
+type FinancialCard = {
+  title: string;
+  amount: string; // Laissé en string pour supporter les formats (Ariary, $ etc.)
+  variation: string;
+  trend: TrendDirection;
+};
+
+// Structure de données pour la répartition des revenus
+type RevenueBreakdown = { label: string; value: number; color: string };
+
+// Structure de données pour les transactions
+type Transaction = { date: string; description: string; montant: string };
+
+// Structure de données pour les comptes
+type Account = { name: string; solde: string };
+
+// Structure de données pour le graphique de tendances
+type TrendData = {
+  months: string[];
+  revenues: number[];
+  expenses: number[];
+};
+
+// ====================================================================
+// API DATA SIMULATION (À REMPLACER PAR VOTRE FETCH/HOOK API)
+// ====================================================================
+
+const SECRET_PASSWORD = "1234"; // Simulation
+
+const financialCards: FinancialCard[] = [
+  {
+    title: "Solde du mois",
+    amount: "5.654.600 Ariary",
+    variation: "+30%",
+    trend: "up",
+  },
+  {
+    title: "Dépense du mois",
+    amount: "2.150.000 Ariary",
+    variation: "-5%",
+    trend: "down",
+  },
+  {
+    title: "Solde en caisse",
+    amount: "1.545.000 Ariary",
+    variation: "+10%",
+    trend: "up",
+  },
+  {
+    title: "Solde en banque",
+    amount: "12.500.000 Ariary", // Ajout d'une valeur pour l'exemple
+    variation: "+18%",
+    trend: "up",
+  },
+];
+
+const revenueBreakdown: RevenueBreakdown[] = [
+  { label: "Dîmes", value: 45, color: "#3b82f6" },
+  { label: "Offrandes", value: 30, color: "#16a34a" },
+  { label: "Dons", value: 15, color: "#eab308" },
+  { label: "Ventes", value: 7, color: "#f97316" },
+  { label: "Autres", value: 3, color: "#ef4444" },
+];
+
+const transactions: Transaction[] = [
+  { date: "15 Jan", description: "Offrande spéciale", montant: "+$2.450" },
+  { date: "13 Jan", description: "Paiement facture", montant: "-$600" },
+  { date: "10 Jan", description: "Dîme collective", montant: "+$4.120" },
+];
+
+const accounts: Account[] = [
+  { name: "Compte principal", solde: "$98.200" },
+  { name: "Fonds missionnaires", solde: "$27.560" },
+  { name: "Épargne projets", solde: "$12.870" },
+];
+
+const trendData: TrendData = {
+  months: ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul"],
+  revenues: [160, 130, 120, 80, 90, 50, 70],
+  expenses: [120, 110, 140, 130, 150, 120, 100],
+};
+
+// ====================================================================
+// COMPONENTS
+// ====================================================================
+
+function SecureFinancialCard({
+  card,
+  showToast,
+}: {
+  card: FinancialCard;
+  showToast: (msg: string, type: "success" | "error" | "warning") => void;
+}) {
+  const [showSolde, setShowSolde] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [password, setPassword] = useState("");
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const clearSoldeTimeout = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (showSolde) {
+      clearSoldeTimeout();
+      timeoutRef.current = setTimeout(() => {
+        setShowSolde(false);
+        showToast("Solde masqué par sécurité.", "warning");
+      }, 30000);
+      return () => clearSoldeTimeout();
+    }
+  }, [showSolde, showToast, clearSoldeTimeout]);
+
+  const handleToggle = () => {
+    if (showSolde) {
+      setShowSolde(false);
+      clearSoldeTimeout();
+    } else {
+      setIsAuthModalOpen(true);
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password === SECRET_PASSWORD) {
+      setShowSolde(true);
+      setIsAuthModalOpen(false);
+      setPassword("");
+      showToast("Solde affiché.", "success");
+    } else {
+      showToast("Mot de passe incorrect.", "error");
+      setPassword("");
+    }
+  };
+
+  return (
+    <>
+      <article className="group relative cursor-pointer rounded-3xl border border-black/5 bg-white p-6 shadow-[0_15px_45px_rgba(0,0,0,0.05)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_60px_rgba(0,0,0,0.1)]">
+        <div className="flex items-start justify-between">
+          <p className="text-sm text-black/60">{card.title}</p>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleToggle();
+            }}
+            className="rounded-full p-1 text-black/40 transition hover:bg-zinc-100 hover:text-blue-500"
+          >
+            {showSolde ? <EyeOffIcon /> : <EyeIcon />}
+          </button>
+        </div>
+        <p className="mt-3 text-3xl font-bold">
+          {showSolde ? card.amount : "****"}
+        </p>
+        <div className="mt-5 flex items-center justify-between text-sm text-black/60">
+          <MiniTrend direction={card.trend} />
+          <span
+            className={`font-semibold ${card.trend === "down" ? "text-red-500" : "text-emerald-500"
+              }`}
+          >
+            {card.variation}
+          </span>
+        </div>
+      </article>
+
+      {isAuthModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-3xl border border-black/10 bg-white p-8 shadow-2xl">
+            <h2 className="mb-6 text-xl font-bold text-blue-600">
+              Accès Sécurisé
+            </h2>
+            <p className="mb-4 text-sm text-black/60">
+              Entrez le code pour afficher le solde.
+            </p>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full rounded-xl border border-black/10 bg-zinc-50 p-3 text-center text-lg tracking-widest focus:border-blue-500"
+                placeholder="••••"
+                autoFocus
+              />
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAuthModalOpen(false)}
+                  className="rounded-xl px-4 py-2 text-sm font-medium text-black/60 hover:bg-zinc-50"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-xl bg-blue-500 px-6 py-2 text-sm font-medium text-white hover:bg-blue-600"
+                >
+                  Afficher
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ====================================================================
+// FIN API DATA SIMULATION
+// ====================================================================
+
+export default function DashboardPage() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const { showToast } = useToast();
+  const isLoading = useLoading(1500);
+
+  if (isLoading) {
+    return <LoadingScreen />;
+  }
+
+  return (
+    <div>
+      <header className="flex flex-wrap items-center justify-between gap-6">
+        <div>
+          <p className="text-sm text-black/60">Hi, Pasteur Jean!</p>
+          <h1 className="text-2xl font-semibold">Welcome back to Dashboard</h1>
+        </div>
+        <div className="flex w-full max-w-sm items-center gap-3 rounded-full border border-black/10 bg-white px-4 py-2">
+          <SearchIcon />
+          <input
+            className="flex-1 bg-transparent text-sm outline-none"
+            placeholder="Search..."
+          />
+        </div>
+      </header>
+
+      <section className="mt-10 space-y-8">
+        <div>
+          <h2 className="text-xl font-semibold">Tableau de Bord Financier</h2>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+          {financialCards.map((card) =>
+            card.title === "Solde en banque" ? (
+              <SecureFinancialCard
+                key={card.title}
+                card={card}
+                showToast={showToast}
+              />
+            ) : (
+              <article
+                key={card.title}
+                className="group cursor-pointer rounded-3xl border border-black/5 bg-white p-6 shadow-[0_15px_45px_rgba(0,0,0,0.05)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_60px_rgba(0,0,0,0.1)]"
+              >
+                <p className="text-sm text-black/60">{card.title}</p>
+                <p className="mt-3 text-3xl font-bold">{card.amount}</p>
+                <div className="mt-5 flex items-center justify-between text-sm text-black/60">
+                  <MiniTrend direction={card.trend} />
+                  <span
+                    className={`font-semibold ${card.trend === "down" ? "text-red-500" : "text-emerald-500"
+                      }`}
+                  >
+                    {card.variation}
+                  </span>
+                </div>
+              </article>
+            )
+          )}
+        </div>
+
+        <div className="grid gap-6 xl:grid-cols-2">
+          <article className="rounded-3xl border border-black/5 bg-white p-6 shadow-[0_15px_45px_rgba(0,0,0,0.05)]">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">
+                Graphique des Tendances (Annuel)
+              </h3>
+              <p className="text-xs uppercase tracking-[0.3em] text-black/40">
+                Revenus vs Dépenses
+              </p>
+            </div>
+            <div className="mt-6 h-80 rounded-2xl border border-dashed border-black/10 bg-zinc-50 p-6">
+              <TrendChart data={trendData} />
+            </div>
+          </article>
+
+          <article className="rounded-3xl border border-black/5 bg-white p-6 shadow-[0_15px_45px_rgba(0,0,0,0.05)]">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Répartition des Revenus</h3>
+              <span className="text-sm text-black/60">Année 2025</span>
+            </div>
+            <div className="mt-6 flex flex-col items-center justify-center gap-8 md:flex-row">
+              <DonutChart data={revenueBreakdown} />
+              <ul className="space-y-4 text-sm">
+                {revenueBreakdown.map((item) => (
+                  <li key={item.label} className="flex items-center gap-3">
+                    <span
+                      className="inline-block h-4 w-4 rounded-full"
+                      style={{ backgroundColor: item.color }}
+                    />
+                    <span className="flex-1 font-medium">{item.label}</span>
+                    <span className="font-semibold text-black">
+                      {item.value}%
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </article>
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          <article className="rounded-3xl border border-black/5 bg-white p-6 shadow-[0_15px_45px_rgba(0,0,0,0.05)]">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Dernières Transactions</h3>
+              <button className="cursor-pointer text-xs uppercase tracking-[0.3em] text-black/40 transition hover:text-black hover:underline">
+                Voir tout
+              </button>
+            </div>
+            <div className="mt-4 space-y-4">
+              {transactions.map((tx) => (
+                <div
+                  key={tx.description}
+                  className="flex items-center justify-between rounded-2xl border border-black/5 px-4 py-3 transition hover:bg-zinc-50"
+                >
+                  <div>
+                    <p className="text-sm font-medium">{tx.description}</p>
+                    <p className="text-xs text-black/50">{tx.date}</p>
+                  </div>
+                  <p className="text-sm font-semibold">{tx.montant}</p>
+                </div>
+              ))}
+            </div>
+          </article>
+
+          <article className="rounded-3xl border border-black/5 bg-white p-6 shadow-[0_15px_45px_rgba(0,0,0,0.05)]">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Aperçus des Comptes</h3>
+              <button className="text-xs uppercase tracking-[0.3em] text-black/40 transition hover:text-black">
+                Gérer
+              </button>
+            </div>
+            <div className="mt-4 space-y-4">
+              {accounts.map((account) => (
+                <div
+                  key={account.name}
+                  className="flex items-center justify-between rounded-2xl border border-black/5 px-4 py-3 transition hover:bg-zinc-50"
+                >
+                  <div>
+                    <p className="text-sm font-medium">{account.name}</p>
+                    <p className="text-xs text-black/50">Solde actuel</p>
+                  </div>
+                  <p className="text-sm font-semibold">{account.solde}</p>
+                </div>
+              ))}
+            </div>
+          </article>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+// Composants graphiques
+function TrendChart({ data }: { data: typeof trendData }) {
+  const maxValue = Math.max(...data.revenues, ...data.expenses);
+  const chartHeight = 250;
+  const chartWidth = 400;
+  const padding = { top: 20, right: 30, bottom: 40, left: 50 };
+  const graphHeight = chartHeight - padding.top - padding.bottom;
+  const graphWidth = chartWidth - padding.left - padding.right;
+
+  const pointsRevenues = data.revenues
+    .map((value, index) => {
+      const x =
+        padding.left + (index * graphWidth) / (data.revenues.length - 1);
+      const y = padding.top + graphHeight - (value / maxValue) * graphHeight;
+      return `${x},${y}`;
+    })
+    .join(" ");
+
+  const pointsExpenses = data.expenses
+    .map((value, index) => {
+      const x =
+        padding.left + (index * graphWidth) / (data.expenses.length - 1);
+      const y = padding.top + graphHeight - (value / maxValue) * graphHeight;
+      return `${x},${y}`;
+    })
+    .join(" ");
+
+  return (
+    <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="h-full w-full">
+      {/* Axe Y */}
+      <line
+        x1={padding.left}
+        y1={padding.top}
+        x2={padding.left}
+        y2={chartHeight - padding.bottom}
+        stroke="rgba(0,0,0,0.2)"
+        strokeWidth="2"
+      />
+      {/* Axe X */}
+      <line
+        x1={padding.left}
+        y1={chartHeight - padding.bottom}
+        x2={chartWidth - padding.right}
+        y2={chartHeight - padding.bottom}
+        stroke="rgba(0,0,0,0.2)"
+        strokeWidth="2"
+      />
+
+      {/* Labels Axe Y */}
+      {[0, 50, 100, 150, 200].map((value, i) => (
+        <g key={i}>
+          <line
+            x1={padding.left - 5}
+            y1={padding.top + graphHeight - (value / maxValue) * graphHeight}
+            x2={padding.left}
+            y2={padding.top + graphHeight - (value / maxValue) * graphHeight}
+            stroke="rgba(0,0,0,0.2)"
+            strokeWidth="1"
+          />
+          <text
+            x={padding.left - 10}
+            y={padding.top + graphHeight - (value / maxValue) * graphHeight + 4}
+            textAnchor="end"
+            fontSize="10"
+            fill="rgba(0,0,0,0.5)"
+          >
+            {value}
+          </text>
+        </g>
+      ))}
+
+      {/* Labels Axe X */}
+      {data.months.map((month, index) => (
+        <text
+          key={month}
+          x={padding.left + (index * graphWidth) / (data.months.length - 1)}
+          y={chartHeight - padding.bottom + 20}
+          textAnchor="middle"
+          fontSize="11"
+          fill="rgba(0,0,0,0.6)"
+        >
+          {month}
+        </text>
+      ))}
+
+      {/* Ligne Revenus */}
+      <polyline
+        points={pointsRevenues}
+        fill="none"
+        stroke="#16a34a"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {/* Ligne Dépenses */}
+      <polyline
+        points={pointsExpenses}
+        fill="none"
+        stroke="#ef4444"
+        strokeWidth="3"
+        strokeDasharray="6 4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+
+      {/* Label Axe Y */}
+      <text
+        x={padding.left - 35}
+        y={chartHeight / 2}
+        textAnchor="middle"
+        fontSize="11"
+        fill="rgba(0,0,0,0.5)"
+        transform={`rotate(-90, ${padding.left - 35}, ${chartHeight / 2})`}
+      >
+        Montant ($)
+      </text>
+
+      {/* Label Axe X */}
+      <text
+        x={chartWidth / 2}
+        y={chartHeight - 5}
+        textAnchor="middle"
+        fontSize="11"
+        fill="rgba(0,0,0,0.5)"
+      >
+        Mois
+      </text>
+    </svg>
+  );
+}
+
+function DonutChart({
+  data,
+}: {
+  data: { label: string; value: number; color: string }[];
+}) {
+  const radius = 70;
+  const innerRadius = 45;
+  const circumference = 2 * Math.PI * radius;
+  const total = data.reduce((sum, item) => sum + item.value, 0);
+  let accumulated = 0;
+  const startOffset = circumference * 0.25;
+
+  return (
+    <svg viewBox="0 0 200 200" className="h-56 w-56">
+      <circle
+        cx="100"
+        cy="100"
+        r={radius}
+        fill="none"
+        stroke="rgba(0,0,0,0.05)"
+        strokeWidth="25"
+      />
+      {data.map((item) => {
+        const dash = (item.value / total) * circumference;
+        const dashOffset = startOffset - accumulated;
+        accumulated += dash;
+
+        return (
+          <circle
+            key={item.label}
+            cx="100"
+            cy="100"
+            r={radius}
+            fill="none"
+            stroke={item.color}
+            strokeWidth="25"
+            strokeDasharray={`${dash} ${circumference - dash}`}
+            strokeDashoffset={dashOffset}
+            strokeLinecap="round"
+          />
+        );
+      })}
+      <circle cx="100" cy="100" r={innerRadius} fill="white" />
+      <text
+        x="100"
+        y="95"
+        textAnchor="middle"
+        fontSize="24"
+        fontWeight="bold"
+        fill="black"
+      >
+        {total}%
+      </text>
+      <text
+        x="100"
+        y="112"
+        textAnchor="middle"
+        fontSize="12"
+        fill="rgba(0,0,0,0.5)"
+      >
+        Total
+      </text>
+    </svg>
+  );
+}
+
+function MiniTrend({ direction }: { direction: "up" | "down" }) {
+  const points =
+    direction === "up" ? "0,18 8,10 15,14 24,4" : "0,6 8,12 15,8 24,18";
+  const strokeColor = direction === "up" ? "#16a34a" : "#ef4444";
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-12 w-full"
+      fill="none"
+      stroke={strokeColor}
+      strokeWidth={2}
+    >
+      <polyline points={points} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
