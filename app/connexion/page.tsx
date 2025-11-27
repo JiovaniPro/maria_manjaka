@@ -3,16 +3,46 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import api from "@/services/api"; // Import du service API
 
 export default function ConnexionPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [motDePasse, setMotDePasse] = useState("");
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Tentative de connexion avec :", { email, motDePasse });
-    router.push("/dashboard");
+    setError("");
+    setIsLoading(true);
+
+    try {
+      const response = await api.post('/auth/login', {
+        email,
+        motDePasse
+      });
+
+      if (response.data && response.data.success) {
+        // Stocker le token et les infos utilisateur
+        localStorage.setItem('token', response.data.data.token);
+        localStorage.setItem('user', JSON.stringify(response.data.data.user));
+
+        // Rediriger vers le dashboard
+        router.push("/dashboard");
+      } else {
+        setError(response.data.message || "Erreur lors de la connexion.");
+      }
+    } catch (err: any) {
+      console.error("Erreur de connexion:", err);
+      if (err.response && err.response.data && err.response.data.message) {
+        setError(err.response.data.message);
+      } else {
+        setError("Impossible de se connecter au serveur. Vérifiez votre connexion.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -29,6 +59,12 @@ export default function ConnexionPage() {
         </header>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {error && (
+            <div className="rounded-xl bg-red-500/10 border border-red-500/20 p-4 text-sm text-red-400 text-center">
+              {error}
+            </div>
+          )}
+
           <div className="space-y-2">
             <label className="text-xs uppercase tracking-[0.3em]" htmlFor="email">
               Adresse e-mail
@@ -39,7 +75,8 @@ export default function ConnexionPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="mt-2 w-full rounded-xl border border-white/20 bg-black/60 px-4 py-3 text-sm text-white placeholder-white/40 outline-none transition focus:border-white focus:ring-2 focus:ring-white/60"
+              disabled={isLoading}
+              className="mt-2 w-full rounded-xl border border-white/20 bg-black/60 px-4 py-3 text-sm text-white placeholder-white/40 outline-none transition focus:border-white focus:ring-2 focus:ring-white/60 disabled:opacity-50"
               placeholder="nom@exemple.com"
             />
           </div>
@@ -54,7 +91,8 @@ export default function ConnexionPage() {
               value={motDePasse}
               onChange={(e) => setMotDePasse(e.target.value)}
               required
-              className="mt-2 w-full rounded-2xl border border-white/20 bg-black/60 px-4 py-3 text-sm text-white placeholder-white/40 outline-none transition focus:border-white focus:ring-2 focus:ring-white/60"
+              disabled={isLoading}
+              className="mt-2 w-full rounded-2xl border border-white/20 bg-black/60 px-4 py-3 text-sm text-white placeholder-white/40 outline-none transition focus:border-white focus:ring-2 focus:ring-white/60 disabled:opacity-50"
               placeholder="••••••••"
             />
           </div>
@@ -71,12 +109,15 @@ export default function ConnexionPage() {
 
           <button
             type="submit"
-            className="group relative inline-flex w-full items-center justify-center overflow-hidden rounded-full border border-white px-6 py-3 text-sm font-semibold uppercase tracking-[0.3em] text-white transition-all hover:bg-white hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+            disabled={isLoading}
+            className="group relative inline-flex w-full items-center justify-center overflow-hidden rounded-full border border-white px-6 py-3 text-sm font-semibold uppercase tracking-[0.3em] text-white transition-all hover:bg-white hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            Se connecter
-            <span className="ml-3 text-base transition group-hover:translate-x-1">
-              &rarr;
-            </span>
+            {isLoading ? "Connexion..." : "Se connecter"}
+            {!isLoading && (
+              <span className="ml-3 text-base transition group-hover:translate-x-1">
+                &rarr;
+              </span>
+            )}
           </button>
         </form>
       </div>

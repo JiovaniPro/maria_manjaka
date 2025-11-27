@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { ReactElement } from "react";
 import { useToast } from "@/components/ToastContainer";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { useLoading } from "@/hooks/useLoading";
 import { ToggleSwitch } from "@/components/ToggleSwitch";
 import { ConfirmModal } from "@/components/ConfirmModal";
+import api from "@/services/api";
 import {
   SearchIcon,
   PlusIcon,
@@ -25,33 +26,11 @@ import {
 type Category = {
   id: string;
   nom: string;
-  code: string;
+  code: string; // codeBudgetaire in DB
   type: "Recette" | "Dépense";
-  transactions: number;
+  transactions: number; // Count from relation
   statut: "actif" | "inactif";
 };
-
-// --- DONNÉES DE DÉPART (pour initialiser l'état)
-const initialCategories: Category[] = [
-  { id: "1", nom: "Dîme", code: "245", type: "Recette", transactions: 3100, statut: "actif" },
-  { id: "2", nom: "Offrandes Cultes", code: "180", type: "Recette", transactions: 45, statut: "actif" },
-  { id: "3", nom: "Vente de Livres", code: "160", type: "Recette", transactions: 0, statut: "inactif" },
-  { id: "4", nom: "Dons", code: "200", type: "Recette", transactions: 125, statut: "actif" },
-  { id: "5", nom: "Location de Salles", code: "175", type: "Recette", transactions: 8, statut: "actif" },
-  { id: "6", nom: "Événements Spéciaux", code: "190", type: "Recette", transactions: 22, statut: "actif" },
-  { id: "7", nom: "Contributions Missions", code: "210", type: "Recette", transactions: 67, statut: "actif" },
-  { id: "8", nom: "Vente Articles Divers", code: "165", type: "Recette", transactions: 14, statut: "actif" },
-  { id: "9", nom: "Offrandes Spéciales", code: "185", type: "Recette", transactions: 33, statut: "actif" },
-  { id: "10", nom: "Loyer", code: "300", type: "Dépense", transactions: 12, statut: "actif" },
-  { id: "11", nom: "Salaires", code: "310", type: "Dépense", transactions: 24, statut: "actif" },
-  { id: "12", nom: "Électricité", code: "320", type: "Dépense", transactions: 12, statut: "actif" },
-  { id: "13", nom: "Entretien", code: "330", type: "Dépense", transactions: 35, statut: "actif" },
-  { id: "14", nom: "Événements Caritatifs", code: "340", type: "Dépense", transactions: 6, statut: "actif" },
-  { id: "15", nom: "Fournitures Bureau", code: "350", type: "Dépense", transactions: 28, statut: "actif" },
-  { id: "16", nom: "Transport", code: "360", type: "Dépense", transactions: 19, statut: "actif" },
-  { id: "17", nom: "Communication", code: "370", type: "Dépense", transactions: 11, statut: "actif" },
-  { id: "18", nom: "Eau", code: "325", type: "Dépense", transactions: 12, statut: "actif" },
-];
 
 // ====================================================================
 // COMPOSANTS MODAL (EXTRAIT POUR CORRIGER LE BUG DE FOCUS)
@@ -173,7 +152,8 @@ export default function CategoriesPage() {
   const isLoading = useLoading(1200);
 
   // 1. Refactorisation: Utilisation de useState pour les données de l'API
-  const [categories, setCategories] = useState<Category[]>(initialCategories);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
 
   const [activeTab, setActiveTab] = useState<"revenues" | "depenses">("revenues");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -191,6 +171,34 @@ export default function CategoriesPage() {
     type: "Recette" as "Recette" | "Dépense",
     statut: true,
   });
+
+  const fetchCategories = async () => {
+    try {
+      setLoadingData(true);
+      const response = await api.get('/categories');
+      const data = response.data.data;
+
+      const mappedCategories: Category[] = data.map((c: any) => ({
+        id: c.id.toString(),
+        nom: c.nom,
+        code: c.codeBudgetaire,
+        type: c.type === 'RECETTE' ? 'Recette' : 'Dépense',
+        transactions: c._count?.transactions || 0,
+        statut: c.statut === 'ACTIF' ? 'actif' : 'inactif'
+      }));
+
+      setCategories(mappedCategories);
+    } catch (error) {
+      console.error("Erreur chargement catégories:", error);
+      showToast("Erreur lors du chargement des catégories", "error");
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCategories();
+  }, []);
 
   // Utilisation de la variable d'état `categories`
   const currentCategories = categories.filter(cat =>
@@ -228,57 +236,56 @@ export default function CategoriesPage() {
     setFormData({ nom: "", code: "", type: "Recette", statut: true });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const statutFinal = formData.statut ? "actif" : "inactif";
+    const statutFinal = formData.statut ? "ACTIF" : "INACTIF";
+    const typeFinal = formData.type === "Recette" ? "RECETTE" : "DEPENSE";
 
-    // Logique d'ajout/modification qui met à jour l'état `categories`
-    if (editingCategory) {
-      // Modification
-      const updatedCategory: Category = {
-        ...editingCategory,
-        nom: formData.nom,
-        code: formData.code,
-        statut: statutFinal,
-        // Le type ne change pas car le select est désactivé
-      };
+    try {
+      if (editingCategory) {
+        // Modification
+        await api.put(`/categories/${editingCategory.id}`, {
+          nom: formData.nom,
+          codeBudgetaire: formData.code,
+          statut: statutFinal
+        });
+        showToast("Catégorie modifiée avec succès", "success");
+      } else {
+        // Ajout
+        await api.post('/categories', {
+          nom: formData.nom,
+          codeBudgetaire: formData.code,
+          type: typeFinal,
+          statut: statutFinal
+        });
+        showToast("Catégorie créée avec succès", "success");
+      }
 
-      setCategories((prev) =>
-        prev.map((cat) => (cat.id === editingCategory.id ? updatedCategory : cat))
-      );
-      showToast("Catégorie modifiée avec succès", "success");
-    } else {
-      // Ajout
-      const newCategory: Category = {
-        id: Date.now().toString(), // ID temporaire
-        nom: formData.nom,
-        code: formData.code,
-        type: formData.type,
-        transactions: 0,
-        statut: statutFinal,
-      };
-
-      setCategories((prev) => [...prev, newCategory]);
-      showToast("Catégorie créée avec succès", "success");
+      fetchCategories();
+      handleCloseModal();
+    } catch (error) {
+      console.error("Erreur sauvegarde:", error);
+      showToast("Erreur lors de l'enregistrement", "error");
     }
-
-    handleCloseModal();
   };
 
   const handleDeleteClick = (category: Category) => {
     setDeleteConfirm({ isOpen: true, category });
   };
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (deleteConfirm.category) {
-      // Logique de suppression qui met à jour l'état `categories`
-      setCategories((prev) =>
-        prev.filter((cat) => cat.id !== deleteConfirm.category!.id)
-      );
-
-      showToast(`Catégorie "${deleteConfirm.category.nom}" supprimée`, "error");
-      setDeleteConfirm({ isOpen: false, category: null });
+      try {
+        await api.delete(`/categories/${deleteConfirm.category.id}`);
+        showToast(`Catégorie "${deleteConfirm.category.nom}" supprimée`, "success");
+        fetchCategories();
+      } catch (error) {
+        console.error("Erreur suppression:", error);
+        showToast("Erreur lors de la suppression", "error");
+      } finally {
+        setDeleteConfirm({ isOpen: false, category: null });
+      }
     }
   };
 
@@ -292,7 +299,7 @@ export default function CategoriesPage() {
     setSearchTerm("");
   };
 
-  if (isLoading) {
+  if (isLoading || (loadingData && categories.length === 0)) {
     return <LoadingScreen />;
   }
 
@@ -328,8 +335,8 @@ export default function CategoriesPage() {
         <button
           onClick={() => handleTabChange("revenues")}
           className={`border-b-2 cursor-pointer px-4 py-3 text-sm font-semibold transition ${activeTab === "revenues"
-              ? "border-black text-black"
-              : "border-transparent text-black/40"
+            ? "border-black text-black"
+            : "border-transparent text-black/40"
             }`}
         >
           Recettes
@@ -337,8 +344,8 @@ export default function CategoriesPage() {
         <button
           onClick={() => handleTabChange("depenses")}
           className={`border-b-2 cursor-pointer px-4 py-3 text-sm font-semibold transition ${activeTab === "depenses"
-              ? "border-black text-black"
-              : "border-transparent text-black/40"
+            ? "border-black text-black"
+            : "border-transparent text-black/40"
             }`}
         >
           Dépenses
@@ -387,8 +394,8 @@ export default function CategoriesPage() {
                   <td className="px-6 py-4">
                     <span
                       className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${category.statut === "actif"
-                          ? "bg-emerald-50 text-emerald-700"
-                          : "bg-red-50 text-red-700"
+                        ? "bg-emerald-50 text-emerald-700"
+                        : "bg-red-50 text-red-700"
                         }`}
                     >
                       <span

@@ -1,3 +1,4 @@
+// src/app/(admin)/dashboard/page.tsx
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
@@ -6,6 +7,7 @@ import { useToast } from "@/components/ToastContainer";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { useLoading } from "@/hooks/useLoading";
 import { SearchIcon, EyeIcon, EyeOffIcon } from "@/components/Icons";
+import api from "@/services/api";
 
 // ====================================================================
 // CONFIG & TYPES
@@ -38,67 +40,10 @@ type TrendData = {
 };
 
 // ====================================================================
-// API DATA SIMULATION (À REMPLACER PAR VOTRE FETCH/HOOK API)
+// COMPONENTS
 // ====================================================================
 
 const SECRET_PASSWORD = "1234"; // Simulation
-
-const financialCards: FinancialCard[] = [
-  {
-    title: "Solde du mois",
-    amount: "5.654.600 Ariary",
-    variation: "+30%",
-    trend: "up",
-  },
-  {
-    title: "Dépense du mois",
-    amount: "2.150.000 Ariary",
-    variation: "-5%",
-    trend: "down",
-  },
-  {
-    title: "Solde en caisse",
-    amount: "1.545.000 Ariary",
-    variation: "+10%",
-    trend: "up",
-  },
-  {
-    title: "Solde en banque",
-    amount: "12.500.000 Ariary", // Ajout d'une valeur pour l'exemple
-    variation: "+18%",
-    trend: "up",
-  },
-];
-
-const revenueBreakdown: RevenueBreakdown[] = [
-  { label: "Dîmes", value: 45, color: "#3b82f6" },
-  { label: "Offrandes", value: 30, color: "#16a34a" },
-  { label: "Dons", value: 15, color: "#eab308" },
-  { label: "Ventes", value: 7, color: "#f97316" },
-  { label: "Autres", value: 3, color: "#ef4444" },
-];
-
-const transactions: Transaction[] = [
-  { date: "15 Jan", description: "Offrande spéciale", montant: "+$2.450" },
-  { date: "13 Jan", description: "Paiement facture", montant: "-$600" },
-  { date: "10 Jan", description: "Dîme collective", montant: "+$4.120" },
-];
-
-const accounts: Account[] = [
-  { name: "Compte principal", solde: "$98.200" },
-  { name: "Fonds missionnaires", solde: "$27.560" },
-  { name: "Épargne projets", solde: "$12.870" },
-];
-
-const trendData: TrendData = {
-  months: ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul"],
-  revenues: [160, 130, 120, 80, 90, 50, 70],
-  expenses: [120, 110, 140, 130, 150, 120, 100],
-};
-
-// ====================================================================
-// COMPONENTS
-// ====================================================================
 
 function SecureFinancialCard({
   card,
@@ -222,17 +167,120 @@ function SecureFinancialCard({
   );
 }
 
-// ====================================================================
-// FIN API DATA SIMULATION
-// ====================================================================
-
 export default function DashboardPage() {
   const pathname = usePathname();
   const router = useRouter();
   const { showToast } = useToast();
   const isLoading = useLoading(1500);
 
-  if (isLoading) {
+  const [financialCards, setFinancialCards] = useState<FinancialCard[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
+
+  // Données mockées pour les graphiques (à remplacer plus tard)
+  const revenueBreakdown: RevenueBreakdown[] = [
+    { label: "Dîmes", value: 45, color: "#3b82f6" },
+    { label: "Offrandes", value: 30, color: "#16a34a" },
+    { label: "Dons", value: 15, color: "#eab308" },
+    { label: "Ventes", value: 7, color: "#f97316" },
+    { label: "Autres", value: 3, color: "#ef4444" },
+  ];
+
+  const trendData: TrendData = {
+    months: ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul"],
+    revenues: [160, 130, 120, 80, 90, 50, 70],
+    expenses: [120, 110, 140, 130, 150, 120, 100],
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('fr-MG', { style: 'currency', currency: 'MGA' }).format(amount);
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' }).format(date);
+  };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoadingData(true);
+
+        // 1. Récupérer les stats du mois
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString();
+
+        const statsResponse = await api.get(`/transactions/stats?dateDebut=${startOfMonth}&dateFin=${endOfMonth}`);
+        const stats = statsResponse.data.data;
+
+        // 2. Récupérer les comptes
+        const comptesResponse = await api.get('/comptes');
+        const comptesData = comptesResponse.data.data;
+
+        // 3. Récupérer les dernières transactions
+        const transactionsResponse = await api.get('/transactions?limit=5');
+        const transactionsData = transactionsResponse.data.data;
+
+        // Préparer les cartes financières
+        const soldeBanque = comptesData.find((c: any) => c.nom.toLowerCase().includes('banque'))?.solde || 0;
+        const soldeCaisse = comptesData.find((c: any) => c.nom.toLowerCase().includes('caisse'))?.solde || 0;
+        // Si pas de compte spécifique trouvé, on prend le total ou le premier
+        const totalSolde = comptesData.reduce((acc: number, c: any) => acc + parseFloat(c.solde), 0);
+
+        setFinancialCards([
+          {
+            title: "Solde du mois",
+            amount: formatCurrency(stats.soldeNet),
+            variation: "+0%", // À calculer si on a les données du mois précédent
+            trend: stats.soldeNet >= 0 ? "up" : "down",
+          },
+          {
+            title: "Dépense du mois",
+            amount: formatCurrency(stats.totalDepenses),
+            variation: "+0%",
+            trend: "down",
+          },
+          {
+            title: "Solde en caisse",
+            amount: formatCurrency(soldeCaisse),
+            variation: "+0%",
+            trend: "up",
+          },
+          {
+            title: "Solde en banque",
+            amount: formatCurrency(soldeBanque),
+            variation: "+0%",
+            trend: "up",
+          },
+        ]);
+
+        // Préparer la liste des transactions
+        setTransactions(transactionsData.map((t: any) => ({
+          date: formatDate(t.dateTransaction),
+          description: t.description || t.type,
+          montant: formatCurrency(t.montant),
+        })));
+
+        // Préparer la liste des comptes
+        setAccounts(comptesData.map((c: any) => ({
+          name: c.nom,
+          solde: formatCurrency(c.solde),
+        })));
+
+      } catch (error) {
+        console.error("Erreur lors du chargement des données:", error);
+        showToast("Erreur lors du chargement des données.", "error");
+      } finally {
+        setLoadingData(false);
+      }
+    };
+
+    fetchData();
+  }, [showToast]);
+
+  if (isLoading || (loadingData && financialCards.length === 0)) {
     return <LoadingScreen />;
   }
 
@@ -335,9 +383,9 @@ export default function DashboardPage() {
               </button>
             </div>
             <div className="mt-4 space-y-4">
-              {transactions.map((tx) => (
+              {transactions.map((tx, index) => (
                 <div
-                  key={tx.description}
+                  key={index}
                   className="flex items-center justify-between rounded-2xl border border-black/5 px-4 py-3 transition hover:bg-zinc-50"
                 >
                   <div>

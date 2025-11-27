@@ -1,12 +1,14 @@
+// src/app/(admin)/transaction/page.tsx
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/components/ToastContainer";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { useLoading } from "@/hooks/useLoading";
 import { TransactionForm } from "@/components/TransactionForm";
 import { ConfirmModal } from "@/components/ConfirmModal";
+import api from "@/services/api";
 import {
   SearchIcon,
   PlusIcon,
@@ -15,8 +17,6 @@ import {
   MenuIcon,
   TagIcon,
   CalculatorIcon,
-  ArrowUpIcon,
-  ArrowDownIcon,
   EditIcon,
   DeleteIcon,
   RefreshIcon,
@@ -38,6 +38,8 @@ type Transaction = {
   type: "Revenu" | "Dépense";
   categorie: string;
   compte: string;
+  categorieId?: number; // Pour l'API
+  compteId?: number; // Pour l'API
 };
 
 type Category = {
@@ -45,6 +47,12 @@ type Category = {
   nom: string;
   type: "Revenu" | "Dépense";
   statut: "actif" | "inactif";
+};
+
+type Account = {
+  id: number;
+  nom: string;
+  solde: number;
 };
 
 type SortField = "date" | "montant" | "description";
@@ -69,109 +77,11 @@ const months = [
   { value: "12", label: "Décembre" },
 ];
 
-const years = ["", "2024", "2023", "2022", "2021"];
-
-// --- DONNÉES FACTICES INITIALES (À REMPLACER PAR VOTRE CHARGEMENT API)
-const initialCategoriesData: Category[] = [
-  { id: "1", nom: "Dîme", type: "Revenu", statut: "actif" },
-  { id: "2", nom: "Offrandes Cultes", type: "Revenu", statut: "actif" },
-  { id: "3", nom: "Vente de Livres", type: "Revenu", statut: "inactif" },
-  { id: "4", nom: "Dons", type: "Revenu", statut: "actif" },
-  { id: "5", nom: "Location de Salles", type: "Revenu", statut: "actif" },
-  { id: "10", nom: "Loyer", type: "Dépense", statut: "actif" },
-  { id: "11", nom: "Salaires", type: "Dépense", statut: "actif" },
-  { id: "12", nom: "Électricité", type: "Dépense", statut: "actif" },
-  { id: "13", nom: "Entretien", type: "Dépense", statut: "actif" },
-  { id: "14", nom: "Matériel", type: "Dépense", statut: "actif" },
-];
-
-let initialTransactionsData: Transaction[] = [
-  {
-    id: "1",
-    date: "2024-10-18",
-    description: "Offrande Culte",
-    montant: 1350,
-    montantAffiche: "+1.350€",
-    type: "Revenu",
-    categorie: "Offrandes Cultes",
-    compte: "Caisse",
-  },
-  {
-    id: "2",
-    date: "2024-10-18",
-    description: "Achat Fournitures",
-    montant: -300,
-    montantAffiche: "-300€",
-    type: "Dépense",
-    categorie: "Matériel",
-    compte: "Caisse",
-  },
-  {
-    id: "3",
-    date: "2024-11-15",
-    description: "Offrande Culte",
-    montant: 1350,
-    montantAffiche: "+1.350€",
-    type: "Revenu",
-    categorie: "Offrandes Cultes",
-    compte: "Caisse",
-  },
-  {
-    id: "4",
-    date: "2024-11-18",
-    description: "Paiement Loyer",
-    montant: -1120,
-    montantAffiche: "-1120€",
-    type: "Dépense",
-    categorie: "Loyer",
-    compte: "Banque A",
-  },
-  {
-    id: "5",
-    date: "2024-09-17",
-    description: "Achat Fournitures",
-    montant: -120,
-    montantAffiche: "-120€",
-    type: "Dépense",
-    categorie: "Matériel",
-    compte: "Banque A",
-  },
-  {
-    id: "6",
-    date: "2024-09-17",
-    description: "Dîme J. Dupont",
-    montant: 250,
-    montantAffiche: "+250€",
-    type: "Revenu",
-    categorie: "Dîme",
-    compte: "Caisse",
-  },
-  {
-    id: "7",
-    date: "2024-11-18",
-    description: "Location Salle",
-    montant: 250,
-    montantAffiche: "+250€",
-    type: "Revenu",
-    categorie: "Location de Salles",
-    compte: "Banque A",
-  },
-  {
-    id: "8",
-    date: "2024-12-05",
-    description: "Dons Anonymes",
-    montant: 250,
-    montantAffiche: "+250€",
-    type: "Revenu",
-    categorie: "Dons",
-    compte: "Caisse",
-  },
-];
+const years = ["", "2025", "2024", "2023", "2022"];
 
 // ====================================================================
 // ICON COMPONENTS
 // ====================================================================
-// (Importés depuis @/components/Icons)
 
 function SortIcon({
   field,
@@ -220,16 +130,13 @@ export default function TransactionsPage() {
   const { showToast } = useToast();
   const isLoading = useLoading(1200);
 
-  // --- VARIABLES D'ÉTAT POUR L'API (À ALIMENTER PAR VOS HOOKS API)
-  // ⚠️ Remplacez ces useState par la récupération de données de votre API
-  const [transactions, setTransactions] = useState<Transaction[]>(
-    initialTransactionsData
-  );
-  const [categoriesData, setCategoriesData] = useState<Category[]>(
-    initialCategoriesData
-  ); // Les catégories peuvent être chargées une fois
-  const [soldeCaisse, setSoldeCaisse] = useState(500); // Solde actuel de la caisse
-  const [soldeBanque, setSoldeBanque] = useState(10000); // Solde actuel de la banque
+  // --- VARIABLES D'ÉTAT POUR L'API
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [categoriesData, setCategoriesData] = useState<Category[]>([]);
+  const [accountsData, setAccountsData] = useState<Account[]>([]);
+  const [soldeCaisse, setSoldeCaisse] = useState(0);
+  const [soldeBanque, setSoldeBanque] = useState(0);
+  const [loadingData, setLoadingData] = useState(true);
   // ------------------------------------------------------------------
 
   // --- Filter States
@@ -268,6 +175,77 @@ export default function TransactionsPage() {
   );
 
   const itemsPerPage = 8;
+
+  // --- Helpers
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('fr-MG', { style: 'currency', currency: 'MGA' }).format(amount);
+  };
+
+  const formatDate = (dateString: string) => {
+    return dateString.split('T')[0];
+  };
+
+  // --- Fetch Data
+  const fetchData = async () => {
+    try {
+      setLoadingData(true);
+
+      // 1. Transactions
+      const transactionsRes = await api.get('/transactions?limit=100');
+      const transactionsApi = transactionsRes.data.data;
+
+      // 2. Categories
+      const categoriesRes = await api.get('/categories');
+      const categoriesApi = categoriesRes.data.data;
+
+      // 3. Comptes
+      const comptesRes = await api.get('/comptes');
+      const comptesApi = comptesRes.data.data;
+
+      // Map Transactions
+      const mappedTransactions: Transaction[] = transactionsApi.map((t: any) => ({
+        id: t.id.toString(),
+        date: formatDate(t.dateTransaction),
+        description: t.description || t.type,
+        montant: t.montant,
+        montantAffiche: t.type === 'RECETTE' ? `+${formatCurrency(t.montant)}` : `-${formatCurrency(t.montant)}`,
+        type: t.type === 'RECETTE' ? 'Revenu' : 'Dépense',
+        categorie: t.categorie?.nom || 'Inconnue',
+        compte: t.compte?.nom || 'Inconnu',
+        categorieId: t.categorieId,
+        compteId: t.compteId
+      }));
+
+      // Map Categories
+      const mappedCategories: Category[] = categoriesApi.map((c: any) => ({
+        id: c.id.toString(),
+        nom: c.nom,
+        type: c.type === 'RECETTE' ? 'Revenu' : 'Dépense',
+        statut: c.statut ? c.statut.toLowerCase() : 'actif'
+      }));
+
+      // Map Accounts
+      setAccountsData(comptesApi);
+      const caisse = comptesApi.find((c: any) => c.nom.toLowerCase().includes('caisse'));
+      const banque = comptesApi.find((c: any) => c.nom.toLowerCase().includes('banque'));
+
+      setSoldeCaisse(caisse ? parseFloat(caisse.solde) : 0);
+      setSoldeBanque(banque ? parseFloat(banque.solde) : 0);
+
+      setTransactions(mappedTransactions);
+      setCategoriesData(mappedCategories);
+
+    } catch (error) {
+      console.error("Erreur chargement données:", error);
+      showToast("Erreur lors du chargement des données", "error");
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   // --- Handlers & Logic
 
@@ -318,9 +296,8 @@ export default function TransactionsPage() {
   };
 
   const getSortedTransactions = () => {
-    let sorted = [...transactions]; // Utilisation de l'état 'transactions'
+    let sorted = [...transactions];
 
-    // Si pas de tri, trier par date descendante par défaut
     if (!sortField) {
       sorted.sort(
         (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
@@ -341,7 +318,7 @@ export default function TransactionsPage() {
           bValue = b.montant;
         } else if (sortField === "description") {
           aValue = a.description.toLowerCase();
-          bValue = b.description.toLowerCase(); // Correction: b.description
+          bValue = b.description.toLowerCase();
         }
 
         if (sortOrder === "asc") {
@@ -392,10 +369,14 @@ export default function TransactionsPage() {
     sortField,
     sortOrder,
     transactions,
-  ]); // Dépendance à 'transactions' pour le re-calcul
+  ]);
 
   const totalMontant = useMemo(() => {
-    return filteredTransactions.reduce((sum, t) => sum + t.montant, 0);
+    // Calculer le total en tenant compte du type (Revenu = +, Dépense = -)
+    // Note: t.montant est déjà positif, mais on doit l'ajuster selon le type pour le total
+    return filteredTransactions.reduce((sum, t) => {
+      return t.type === 'Revenu' ? sum + t.montant : sum - t.montant;
+    }, 0);
   }, [filteredTransactions]);
 
   const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
@@ -433,7 +414,6 @@ export default function TransactionsPage() {
       setIsAuthModalOpen(false);
 
       if (selectedTransactionToModify) {
-        // Préremplir le formulaire avec les données de la transaction
         const montantAbsolu = Math.abs(
           selectedTransactionToModify.montant
         ).toString();
@@ -445,7 +425,7 @@ export default function TransactionsPage() {
           type: selectedTransactionToModify.type,
           categorie: selectedTransactionToModify.categorie,
           compte: selectedTransactionToModify.compte,
-          numeroCheque: "", // Dans une vraie application, cela viendrait de la transaction
+          numeroCheque: "",
         });
         setIsModifyModalOpen(true);
       }
@@ -455,7 +435,7 @@ export default function TransactionsPage() {
     }
   };
 
-  const handleModifyTransaction = (e: React.FormEvent) => {
+  const handleModifyTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (showNumeroCheque && !formData.numeroCheque) {
@@ -466,46 +446,45 @@ export default function TransactionsPage() {
       return;
     }
 
-    // Mise à jour de l'état `transactions` au lieu du tableau global
-    setTransactions((prevTransactions) => {
-      const index = prevTransactions.findIndex((t) => t.id === formData.id);
+    try {
+      // Trouver les IDs correspondants aux noms
+      const cat = categoriesData.find(c => c.nom === formData.categorie);
+      const acc = accountsData.find(a => a.nom === formData.compte);
 
-      if (index !== -1) {
-        const montantFinal =
-          formData.type === "Revenu" ? montantNumber : -montantNumber;
-
-        const updatedTransaction = {
-          ...prevTransactions[index],
-          date: formData.date,
-          description: formData.description,
-          montant: montantFinal,
-          montantAffiche:
-            montantFinal >= 0 ? `+${montantNumber}€` : `-${montantNumber}€`,
-          type: formData.type,
-          categorie: formData.categorie,
-          compte: formData.compte,
-        };
-
-        const newTransactions = [...prevTransactions];
-        newTransactions[index] = updatedTransaction;
-        return newTransactions;
+      if (!cat || !acc) {
+        showToast("Catégorie ou compte invalide", "error");
+        return;
       }
-      return prevTransactions;
-    });
 
-    showToast("Transaction modifiée avec succès", "success");
-    setIsModifyModalOpen(false);
-    setSelectedTransactionToModify(null);
-    setFormData({
-      id: "",
-      date: new Date().toISOString().substring(0, 10),
-      description: "",
-      montant: "",
-      type: "Revenu",
-      categorie: "",
-      compte: "",
-      numeroCheque: "",
-    });
+      await api.put(`/transactions/${formData.id}`, {
+        categorieId: parseInt(cat.id),
+        compteId: acc.id,
+        dateTransaction: formData.date,
+        description: formData.description,
+        montant: parseFloat(formData.montant),
+        type: formData.type === 'Revenu' ? 'RECETTE' : 'DEPENSE'
+      });
+
+      showToast("Transaction modifiée avec succès", "success");
+      setIsModifyModalOpen(false);
+      setSelectedTransactionToModify(null);
+      fetchData(); // Recharger les données
+
+      setFormData({
+        id: "",
+        date: new Date().toISOString().substring(0, 10),
+        description: "",
+        montant: "",
+        type: "Revenu",
+        categorie: "",
+        compte: "",
+        numeroCheque: "",
+      });
+
+    } catch (error) {
+      console.error("Erreur modification:", error);
+      showToast("Erreur lors de la modification", "error");
+    }
   };
 
   // --- Delete Logic
@@ -515,22 +494,24 @@ export default function TransactionsPage() {
     setIsDeleteModalOpen(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (transactionToDelete) {
-      // Mise à jour de l'état `transactions` au lieu du tableau global
-      setTransactions((prevTransactions) => {
-        return prevTransactions.filter((t) => t.id !== transactionToDelete);
-      });
-
-      showToast(`Transaction ${transactionToDelete} supprimée.`, "error");
-      setIsDeleteModalOpen(false);
-      setTransactionToDelete(null);
+      try {
+        await api.delete(`/transactions/${transactionToDelete}`);
+        showToast(`Transaction supprimée.`, "success"); // Changed to success type
+        setIsDeleteModalOpen(false);
+        setTransactionToDelete(null);
+        fetchData(); // Recharger les données
+      } catch (error) {
+        console.error("Erreur suppression:", error);
+        showToast("Erreur lors de la suppression", "error");
+      }
     }
   };
 
   // --- Add Logic
 
-  const handleAddTransaction = (e: React.FormEvent) => {
+  const handleAddTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (showNumeroCheque && !formData.numeroCheque) {
@@ -546,40 +527,47 @@ export default function TransactionsPage() {
       return;
     }
 
-    const newTransaction: Transaction = {
-      // Génération d'un ID unique simple (ajuster pour votre API)
-      id:
-        transactions.length > 0
-          ? (parseInt(transactions[transactions.length - 1].id) + 1).toString()
-          : "1",
-      date: formData.date,
-      description: formData.description,
-      montant: formData.type === "Revenu" ? montantNumber : -montantNumber,
-      montantAffiche:
-        formData.type === "Revenu" ? `+${montantNumber}€` : `-${montantNumber}€`,
-      type: formData.type,
-      categorie: formData.categorie,
-      compte: formData.compte,
-    };
+    try {
+      // Trouver les IDs correspondants aux noms
+      const cat = categoriesData.find(c => c.nom === formData.categorie);
+      const acc = accountsData.find(a => a.nom === formData.compte);
 
-    // Mise à jour de l'état `transactions` au lieu du tableau global
-    setTransactions((prevTransactions) => [...prevTransactions, newTransaction]);
+      if (!cat || !acc) {
+        showToast("Catégorie ou compte invalide", "error");
+        return;
+      }
 
-    showToast("Transaction ajoutée avec succès", "success");
-    setIsAddModalOpen(false);
-    setFormData({
-      id: "",
-      date: new Date().toISOString().substring(0, 10),
-      description: "",
-      montant: "",
-      type: "Revenu",
-      categorie: "",
-      compte: "",
-      numeroCheque: "",
-    });
+      await api.post('/transactions', {
+        categorieId: parseInt(cat.id),
+        compteId: acc.id,
+        dateTransaction: formData.date,
+        description: formData.description,
+        montant: parseFloat(formData.montant),
+        type: formData.type === 'Revenu' ? 'RECETTE' : 'DEPENSE'
+      });
+
+      showToast("Transaction ajoutée avec succès", "success");
+      setIsAddModalOpen(false);
+      fetchData(); // Recharger les données
+
+      setFormData({
+        id: "",
+        date: new Date().toISOString().substring(0, 10),
+        description: "",
+        montant: "",
+        type: "Revenu",
+        categorie: "",
+        compte: "",
+        numeroCheque: "",
+      });
+
+    } catch (error) {
+      console.error("Erreur ajout:", error);
+      showToast("Erreur lors de l'ajout", "error");
+    }
   };
 
-  if (isLoading) {
+  if (isLoading || (loadingData && transactions.length === 0)) {
     return <LoadingScreen />;
   }
 
@@ -656,8 +644,9 @@ export default function TransactionsPage() {
               className="cursor-pointer bg-transparent text-sm outline-none"
             >
               <option value="">Tous les comptes</option>
-              <option value="Caisse">Caisse</option>
-              <option value="Banque A">Banque A</option>
+              {accountsData.map((acc) => (
+                <option key={acc.id} value={acc.nom}>{acc.nom}</option>
+              ))}
             </select>
           </div>
 
@@ -715,7 +704,7 @@ export default function TransactionsPage() {
                 }`}
             >
               {totalMontant >= 0 ? "+" : ""}
-              {totalMontant}€
+              {formatCurrency(totalMontant)}
             </p>
           </div>
         </div>
@@ -792,8 +781,8 @@ export default function TransactionsPage() {
                     <td className="px-6 py-4">
                       <span
                         className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${t.type === "Revenu"
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                            : "bg-red-50 text-red-700 border border-red-200"
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          : "bg-red-50 text-red-700 border border-red-200"
                           }`}
                       >
                         {t.type === "Revenu" ? "Recette" : "Dépense"}
@@ -902,6 +891,7 @@ export default function TransactionsPage() {
           showNumeroCheque={showNumeroCheque}
           soldeCaisse={soldeCaisse}
           soldeBanque={soldeBanque}
+          accounts={accountsData}
         />
       )}
 
@@ -956,6 +946,7 @@ export default function TransactionsPage() {
           showNumeroCheque={showNumeroCheque}
           soldeCaisse={soldeCaisse}
           soldeBanque={soldeBanque}
+          accounts={accountsData}
         />
       )}
 

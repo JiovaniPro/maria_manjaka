@@ -10,6 +10,12 @@ type Category = {
     statut: "actif" | "inactif";
 };
 
+type Account = {
+    id: number;
+    nom: string;
+    solde: number;
+};
+
 type TransactionFormProps = {
     onSubmit: (e: React.FormEvent) => void;
     title: string;
@@ -21,6 +27,7 @@ type TransactionFormProps = {
     ) => void;
     handleTypeChange: (newType: "Revenu" | "Dépense") => void;
     availableCategories: Category[];
+    accounts: Account[];
     isCaisseDisabled: boolean;
     showNumeroCheque: boolean;
     soldeCaisse: number;
@@ -36,6 +43,7 @@ export function TransactionForm({
     handleInputChange,
     handleTypeChange,
     availableCategories,
+    accounts,
     isCaisseDisabled,
     showNumeroCheque,
     soldeCaisse,
@@ -64,8 +72,8 @@ export function TransactionForm({
                                 type="button"
                                 onClick={() => handleTypeChange("Revenu")}
                                 className={`flex-1 rounded-xl border-2 px-4 py-3 text-center text-sm font-semibold transition ${formData.type === "Revenu"
-                                        ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                                        : "border-black/10 bg-zinc-50 text-black/70 hover:bg-zinc-100"
+                                    ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                                    : "border-black/10 bg-zinc-50 text-black/70 hover:bg-zinc-100"
                                     }`}
                             >
                                 Recette (Revenu)
@@ -74,8 +82,8 @@ export function TransactionForm({
                                 type="button"
                                 onClick={() => handleTypeChange("Dépense")}
                                 className={`flex-1 rounded-xl border-2 px-4 py-3 text-center text-sm font-semibold transition ${formData.type === "Dépense"
-                                        ? "border-red-500 bg-red-50 text-red-700"
-                                        : "border-black/10 bg-zinc-50 text-black/70 hover:bg-zinc-100"
+                                    ? "border-red-500 bg-red-50 text-red-700"
+                                    : "border-black/10 bg-zinc-50 text-black/70 hover:bg-zinc-100"
                                     }`}
                             >
                                 Dépense
@@ -102,7 +110,7 @@ export function TransactionForm({
                         {/* Montant */}
                         <div>
                             <label className="mb-2 block text-sm font-semibold text-black">
-                                Montant (€)
+                                Montant (Ar)
                             </label>
                             <input
                                 type="number"
@@ -175,22 +183,23 @@ export function TransactionForm({
                                 <option value="" disabled>
                                     Sélectionner un compte
                                 </option>
-                                <option
-                                    value="Caisse"
-                                    disabled={isCaisseDisabled}
-                                    title={
-                                        isCaisseDisabled
-                                            ? `Solde Caisse actuel: ${soldeCaisse}€, montant trop élevé`
-                                            : `Solde actuel: ${soldeCaisse}€`
-                                    }
-                                    className={isCaisseDisabled ? "text-red-500" : ""}
-                                >
-                                    Caisse{" "}
-                                    {isCaisseDisabled
-                                        ? `(Solde insuffisant: ${soldeCaisse}€)`
-                                        : `(${soldeCaisse}€)`}
-                                </option>
-                                <option value="Banque A">Banque A ({soldeBanque}€)</option>
+                                {accounts.map((account) => {
+                                    // Logic specific to Caisse check if needed, or just generic
+                                    const isCaisse = account.nom.toLowerCase().includes('caisse');
+                                    const isDisabled = isCaisse && isCaisseDisabled;
+
+                                    return (
+                                        <option
+                                            key={account.id}
+                                            value={account.nom}
+                                            disabled={isDisabled}
+                                            className={isDisabled ? "text-red-500" : ""}
+                                        >
+                                            {account.nom} ({account.solde} Ar)
+                                            {isDisabled ? " (Solde insuffisant)" : ""}
+                                        </option>
+                                    );
+                                })}
                             </select>
                         </div>
                     </div>
