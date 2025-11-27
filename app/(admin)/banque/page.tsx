@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useToast } from "@/components/ToastContainer";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { useLoading } from "@/hooks/useLoading";
+import api from "@/services/api"; // Import API
 import {
   SearchIcon,
   PlusIcon,
@@ -26,38 +27,28 @@ const ITEMS_PER_PAGE = 10;
 
 type BankTransaction = {
   id: string;
-  date: string;
+  date: string; // ISO string from API
   description: string;
   montant: number;
-  type: "Retrait" | "Dépôt";
-  numeroCheque?: string; // Optionnel, seulement pour retrait
+  type: "Retrait" | "Dépôt" | "RETRAIT" | "DEPOT"; // Handle both API and local types
+  numeroCheque?: string;
+  compteId?: number;
+};
+
+type BankAccount = {
+  id: number;
+  nom: string;
+  soldeActuel: string | number;
+  type: string;
 };
 
 // ====================================================================
-// API DATA SIMULATION (À REMPLACER PAR VOTRE FETCH/HOOK API)
+// API DATA SIMULATION (REMOVED)
 // ====================================================================
 
-// 1. Clés Secrètes et Balances
+// 1. Clés Secrètes
 const SECRET_PASSWORD = "1234"; // Simulation mot de passe administrateur
-const CAISSE_BALANCE = 500000; // Montant simulé en caisse pour le bouton de dépôt (en EUR ou Ariary)
-
-// 2. Données Mockées (Simulées)
-let bankData: BankTransaction[] = [
-  { id: "1", date: "2024-11-10", description: "Paiement Loyer Décembre", montant: -1200, type: "Retrait", numeroCheque: "CHQ-88541" },
-  { id: "2", date: "2024-11-12", description: "Virement Dîmes Semaine 45", montant: 4500, type: "Dépôt" },
-  { id: "3", date: "2024-11-15", description: "Achat Matériel Sonorisation", montant: -850, type: "Retrait", numeroCheque: "CHQ-88542" },
-  { id: "4", date: "2024-11-20", description: "Donateur Anonyme", montant: 2000, type: "Dépôt" },
-  { id: "5", date: "2024-11-25", description: "Facture Electricité (Jirama)", montant: -320, type: "Retrait", numeroCheque: "CHQ-88543" },
-  { id: "6", date: "2024-10-01", description: "Retrait Espèces pour Caisse", montant: -500, type: "Retrait", numeroCheque: "CHQ-88544" },
-  { id: "7", date: "2024-10-05", description: "Offrandes du Culte du 05/10", montant: 1500, type: "Dépôt" },
-  { id: "8", date: "2024-10-18", description: "Paiement Fournitures Bureau", montant: -150, type: "Retrait", numeroCheque: "CHQ-88545" },
-  { id: "9", date: "2024-09-02", description: "Transfert Dîmes Début Sept", montant: 3000, type: "Dépôt" },
-  { id: "10", date: "2024-09-15", description: "Frais Bancaires Mensuels", montant: -15, type: "Retrait", numeroCheque: "CHQ-88546" },
-  { id: "11", date: "2024-09-28", description: "Don exceptionnel", montant: 1000, type: "Dépôt" },
-];
-
-// 3. Calcul du solde actuel (à remplacer par la valeur renvoyée par l'API)
-const soldeBanqueActuel = bankData.reduce((acc, curr) => acc + curr.montant, 0);
+const CAISSE_BALANCE = 500000; // Montant simulé en caisse (à récupérer via API si nécessaire)
 
 const months = [
   { value: "", label: "Tous les mois" },
@@ -337,6 +328,12 @@ export default function BanquePage() {
   const [dataVersion, setDataVersion] = useState(0); // Trigger refresh
   const [currentPage, setCurrentPage] = useState(1);
 
+  // Data States
+  const [transactions, setTransactions] = useState<BankTransaction[]>([]);
+  const [bankAccount, setBankAccount] = useState<BankAccount | null>(null);
+  const [caisseBalance, setCaisseBalance] = useState<number>(0);
+  const [loadingData, setLoadingData] = useState(false);
+
   // Filter States
   const [searchTerm, setSearchTerm] = useState("");
   const [filterMonth, setFilterMonth] = useState("");
@@ -358,6 +355,61 @@ export default function BanquePage() {
     type: "Retrait" // Temporaire, sera mis à jour
   };
   const [formData, setFormData] = useState<Partial<BankTransaction>>(initialFormData);
+
+  // --- Fetch Data ---
+  const fetchData = async () => {
+    try {
+      setLoadingData(true);
+
+      // 1. Fetch Accounts
+      const accountsRes = await api.get('/comptes');
+      const accounts = accountsRes.data.data;
+
+      const banque = accounts.find((acc: any) => acc.type === 'BANQUE' || acc.nom.toLowerCase().includes('banque'));
+      const caisse = accounts.find((acc: any) => acc.type === 'CAISSE' || acc.nom.toLowerCase().includes('caisse'));
+
+      if (caisse) {
+        setCaisseBalance(parseFloat(caisse.soldeActuel));
+      }
+
+      if (banque) {
+        setBankAccount(banque);
+
+        // 2. Fetch Transactions for this account
+        const transactionsRes = await api.get(`/transactions-bancaires?compteId=${banque.id}`);
+
+        // Map API data to frontend model
+        const mappedTransactions = transactionsRes.data.data.map((t: any) => {
+          const amount = parseFloat(t.montant);
+          return {
+            id: t.id.toString(),
+            date: t.dateOperation, // Use dateOperation from API
+            description: t.description,
+            montant: t.type === 'RETRAIT' ? -Math.abs(amount) : Math.abs(amount), // Apply sign based on type
+            type: t.type === 'RETRAIT' ? 'Retrait' : 'Dépôt',
+            numeroCheque: t.numeroCheque,
+            compteId: t.compteId
+          };
+        });
+
+        setTransactions(mappedTransactions);
+      } else {
+        showToast("Compte bancaire non trouvé.", "error");
+      }
+
+    } catch (error) {
+      console.error("Erreur chargement données:", error);
+      showToast("Erreur lors du chargement des données bancaires", "error");
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [dataVersion]);
+
+  const soldeBanqueActuel = bankAccount ? Number(bankAccount.soldeActuel) : 0;
 
   // --- Handlers ---
 
@@ -403,7 +455,7 @@ export default function BanquePage() {
     }
   };
 
-  const handleSaveModification = (e: React.FormEvent) => {
+  const handleSaveModification = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const isRetrait = formData.type === "Retrait";
@@ -412,25 +464,33 @@ export default function BanquePage() {
       return;
     }
 
-    // ⚠️ LOGIQUE API : Remplacez par votre appel PUT/PATCH à l'API
-    const index = bankData.findIndex(d => d.id === formData.id);
-    if (index !== -1 && formData.id) {
-      bankData[index] = {
-        ...bankData[index],
-        ...formData as BankTransaction,
-        montant: isRetrait ? -(Number(formData.montant) || 0) : (Number(formData.montant) || 0), // Assurer le signe
-        type: formData.type || bankData[index].type
-      };
-      showToast("Modification enregistrée", "success");
-      setIsModifyModalOpen(false);
-      setDataVersion(v => v + 1); // Déclencheur de rafraîchissement
-      setCurrentPage(1);
+    try {
+      if (formData.id) {
+        // Prepare payload
+        const payload = {
+          dateOperation: formData.date,
+          description: formData.description,
+          montant: Math.abs(Number(formData.montant)),
+          type: formData.type === "Retrait" ? "RETRAIT" : "DEPOT",
+          numeroCheque: formData.numeroCheque
+        };
+
+        await api.put(`/transactions-bancaires/${formData.id}`, payload);
+
+        showToast("Modification enregistrée", "success");
+        setIsModifyModalOpen(false);
+        setDataVersion(v => v + 1); // Déclencheur de rafraîchissement
+        setCurrentPage(1);
+      }
+    } catch (error) {
+      console.error("Erreur modification:", error);
+      showToast("Erreur lors de la modification", "error");
     }
   };
 
-  const handleAddItem = (e: React.FormEvent) => {
+  const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
-    const type = formData.type || activeTab === "retrait" ? "Retrait" : "Dépôt";
+    const type = formData.type || (activeTab === "retrait" ? "Retrait" : "Dépôt");
     const montant = Number(formData.montant);
 
     if (type === "Retrait" && !formData.numeroCheque) {
@@ -442,28 +502,55 @@ export default function BanquePage() {
       return;
     }
 
-    // ⚠️ LOGIQUE API : Remplacez par votre appel POST à l'API
-    const newTransaction: BankTransaction = {
-      id: Date.now().toString(),
-      date: formData.date || new Date().toISOString().substring(0, 10),
-      description: formData.description || "Nouvelle transaction",
-      montant: type === "Retrait" ? -montant : montant, // Stocker le montant avec le signe
-      type: type,
-      numeroCheque: type === "Retrait" ? formData.numeroCheque : undefined
-    };
-    bankData.unshift(newTransaction); // Ajout local simulé
-    showToast(`${type} ajouté avec succès.`, "success");
-    setIsAddModalOpen(false);
-    setDataVersion(v => v + 1); // Déclencheur de rafraîchissement
-    setCurrentPage(1);
+    if (!bankAccount) {
+      showToast("Compte bancaire non identifié.", "error");
+      return;
+    }
+
+    // Validation Solde Caisse pour Dépôt
+    if (type === "Dépôt" && montant > caisseBalance) {
+      showToast(`Impossible: Solde de caisse insuffisant (${caisseBalance.toLocaleString('fr-FR')} €) pour ce dépôt.`, "error");
+      return;
+    }
+
+    // Validation Solde Banque pour Retrait
+    const soldeBanque = parseFloat(bankAccount.soldeActuel.toString());
+    if (type === "Retrait" && montant > soldeBanque) {
+      showToast(`Impossible: Solde bancaire insuffisant (${soldeBanque.toLocaleString('fr-FR')} €) pour ce retrait.`, "error");
+      return;
+    }
+
+    try {
+      const payload = {
+        compteId: bankAccount.id,
+        dateOperation: formData.date,
+        description: formData.description || "Nouvelle transaction",
+        montant: montant,
+        type: type === "Retrait" ? "RETRAIT" : "DEPOT",
+        numeroCheque: type === "Retrait" ? formData.numeroCheque : undefined
+      };
+
+      await api.post('/transactions-bancaires', payload);
+
+      showToast(`${type} ajouté avec succès.`, "success");
+      setIsAddModalOpen(false);
+      setDataVersion(v => v + 1); // Déclencheur de rafraîchissement
+      setCurrentPage(1);
+    } catch (error) {
+      console.error("Erreur ajout:", error);
+      // Afficher le message d'erreur du backend s'il existe
+      const msg = (error as any).response?.data?.message || "Erreur lors de l'ajout";
+      showToast(msg, "error");
+    }
   };
 
   // Filter Data based on Tab, Filters, and Search
   const filteredData = useMemo(() => {
-    const v = dataVersion; // Dependency
-    let data = bankData.filter(d =>
-      activeTab === "retrait" ? d.type === "Retrait" : d.type === "Dépôt"
-    );
+    // Normalize types for filtering
+    let data = transactions.filter(d => {
+      const isRetrait = d.type === "Retrait" || d.type === "RETRAIT";
+      return activeTab === "retrait" ? isRetrait : !isRetrait;
+    });
 
     // 1. Filter by Date
     data = data.filter(t => {
@@ -487,7 +574,7 @@ export default function BanquePage() {
     data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     return data;
-  }, [activeTab, dataVersion, searchTerm, filterMonth, filterYear]);
+  }, [activeTab, transactions, searchTerm, filterMonth, filterYear]);
 
   // Calcul du total des éléments filtrés 
   const totalFilteredAmount = useMemo(() => {
