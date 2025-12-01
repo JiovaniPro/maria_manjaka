@@ -176,15 +176,21 @@ export default function DashboardPage() {
   const [financialCards, setFinancialCards] = useState<FinancialCard[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [revenueBreakdown, setRevenueBreakdown] = useState<RevenueBreakdown[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
-  // Données mockées pour les graphiques (à remplacer plus tard)
-  const revenueBreakdown: RevenueBreakdown[] = [
-    { label: "Dîmes", value: 45, color: "#3b82f6" },
-    { label: "Offrandes", value: 30, color: "#16a34a" },
-    { label: "Dons", value: 15, color: "#eab308" },
-    { label: "Ventes", value: 7, color: "#f97316" },
-    { label: "Autres", value: 3, color: "#ef4444" },
+  // Palette de couleurs pour les catégories
+  const colorPalette = [
+    "#3b82f6", // bleu
+    "#16a34a", // vert
+    "#eab308", // jaune
+    "#f97316", // orange
+    "#ef4444", // rouge
+    "#8b5cf6", // violet
+    "#06b6d4", // cyan
+    "#ec4899", // rose
+    "#14b8a6", // turquoise
+    "#f59e0b", // ambre
   ];
 
   const trendData: TrendData = {
@@ -230,6 +236,12 @@ export default function DashboardPage() {
         const transactionsResponse = await api.get('/transactions?limit=3');
         const transactionsData = transactionsResponse.data.data;
 
+        // 4. Récupérer toutes les transactions RECETTE du mois pour la répartition
+        const recettesResponse = await api.get(
+          `/transactions?type=RECETTE&dateDebut=${startOfMonth}&dateFin=${endOfMonth}&limit=1000`
+        );
+        const recettesData = recettesResponse.data.data || [];
+
         // Calculer les soldes totaux par type
         const soldeCaisse = comptesCaisse.reduce((acc: number, c: any) => 
           acc + parseFloat(c.soldeActuel || 0), 0
@@ -237,6 +249,30 @@ export default function DashboardPage() {
         const soldeBanque = comptesBanque.reduce((acc: number, c: any) => 
           acc + parseFloat(c.soldeActuel || 0), 0
         );
+
+        // Calculer la répartition des revenus par catégorie
+        const categoryMap = new Map<string, number>();
+        
+        recettesData.forEach((t: any) => {
+          const categoryName = t.categorie?.nom || 'Inconnue';
+          const montant = parseFloat(t.montant || 0);
+          const currentTotal = categoryMap.get(categoryName) || 0;
+          categoryMap.set(categoryName, currentTotal + montant);
+        });
+
+        // Calculer le total des recettes
+        const totalRecettes = Array.from(categoryMap.values()).reduce((sum, val) => sum + val, 0);
+
+        // Convertir en tableau avec pourcentages et couleurs
+        const breakdown: RevenueBreakdown[] = Array.from(categoryMap.entries())
+          .map(([label, value], index) => ({
+            label,
+            value: totalRecettes > 0 ? Math.round((value / totalRecettes) * 100) : 0,
+            color: colorPalette[index % colorPalette.length],
+          }))
+          .sort((a, b) => b.value - a.value); // Trier par valeur décroissante
+
+        setRevenueBreakdown(breakdown);
 
         setFinancialCards([
           {
@@ -268,8 +304,8 @@ export default function DashboardPage() {
         // Préparer la liste des transactions
         setTransactions(transactionsData.map((t: any) => ({
           date: formatDate(t.dateTransaction),
-              description: t.description || t.type,
-                montant: formatCurrency(t.montant),
+          description: t.description || t.type,
+          montant: formatCurrency(t.montant),
         })));
 
         // Préparer la liste des comptes
@@ -361,24 +397,34 @@ export default function DashboardPage() {
           <article className="rounded-3xl border border-black/5 bg-white p-6 shadow-[0_15px_45px_rgba(0,0,0,0.05)]">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold">Répartition des Revenus</h3>
-              <span className="text-sm text-black/60">Année 2025</span>
+              <span className="text-sm text-black/60">
+                {new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+              </span>
             </div>
             <div className="mt-6 flex flex-col items-center justify-center gap-8 md:flex-row">
-              <DonutChart data={revenueBreakdown} />
-              <ul className="space-y-4 text-sm">
-                {revenueBreakdown.map((item) => (
-                  <li key={item.label} className="flex items-center gap-3">
-                    <span
-                      className="inline-block h-4 w-4 rounded-full"
-                      style={{ backgroundColor: item.color }}
-                    />
-                    <span className="flex-1 font-medium">{item.label}</span>
-                    <span className="font-semibold text-black">
-                      {item.value}%
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              {revenueBreakdown.length > 0 ? (
+                <>
+                  <DonutChart data={revenueBreakdown} />
+                  <ul className="space-y-4 text-sm">
+                    {revenueBreakdown.map((item) => (
+                      <li key={item.label} className="flex items-center gap-3">
+                        <span
+                          className="inline-block h-4 w-4 rounded-full"
+                          style={{ backgroundColor: item.color }}
+                        />
+                        <span className="flex-1 font-medium">{item.label}</span>
+                        <span className="font-semibold text-black">
+                          {item.value}%
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-black/40">
+                  <p className="text-sm">Aucune recette enregistrée ce mois</p>
+                </div>
+              )}
             </div>
           </article>
         </div>
@@ -387,7 +433,7 @@ export default function DashboardPage() {
           <article className="rounded-3xl border border-black/5 bg-white p-6 shadow-[0_15px_45px_rgba(0,0,0,0.05)]">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold">Dernières Transactions</h3>
-              <button 
+              <button
                 onClick={() => router.push('/transaction')}
                 className="cursor-pointer text-xs uppercase tracking-[0.3em] text-black/40 transition hover:text-black hover:underline"
               >
