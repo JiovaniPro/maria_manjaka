@@ -48,7 +48,6 @@ type BankAccount = {
 
 // 1. Clés Secrètes
 const SECRET_PASSWORD = "1234"; // Simulation mot de passe administrateur
-const CAISSE_BALANCE = 500000; // Montant simulé en caisse (à récupérer via API si nécessaire)
 
 const months = [
   { value: "", label: "Tous les mois" },
@@ -209,10 +208,11 @@ interface ModalFormProps {
   setFormData: React.Dispatch<React.SetStateAction<Partial<BankTransaction>>>;
   isRetrait: boolean;
   isModification: boolean;
-  showToast: (message: string, type: 'success' | 'error' | 'warning' | 'info') => void; // Ajout du toast
+  showToast: (message: string, type: 'success' | 'error' | 'warning' | 'info') => void;
+  caisseBalance: number; // Ajout du solde de caisse réel
 }
 
-const ModalForm: React.FC<ModalFormProps> = ({ title, onSubmit, onClose, formData, setFormData, isRetrait, isModification, showToast }) => {
+const ModalForm: React.FC<ModalFormProps> = ({ title, onSubmit, onClose, formData, setFormData, isRetrait, isModification, showToast, caisseBalance }) => {
 
   const shouldShowCheque = isModification ? formData.type === "Retrait" : isRetrait;
   const isNewDeposit = !isModification && !isRetrait; // C'est un nouveau dépôt
@@ -222,11 +222,11 @@ const ModalForm: React.FC<ModalFormProps> = ({ title, onSubmit, onClose, formDat
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // NOUVEAU: Handler pour pré-remplir avec le solde de caisse (UI/UX Amélioré)
+  // Handler pour pré-remplir avec le solde de caisse réel
   const handleSetCaisseBalance = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
-    setFormData((prev) => ({ ...prev, montant: CAISSE_BALANCE }));
-    showToast(`Montant Caisse (${CAISSE_BALANCE.toLocaleString('fr-FR')} Ar) pré-rempli.`, "info");
+    setFormData((prev) => ({ ...prev, montant: caisseBalance }));
+    showToast(`Montant Caisse (${caisseBalance.toLocaleString('fr-FR')} Ar) pré-rempli.`, "info");
   };
 
   return (
@@ -243,7 +243,7 @@ const ModalForm: React.FC<ModalFormProps> = ({ title, onSubmit, onClose, formDat
               <input type="date" name="date" required value={formData.date || new Date().toISOString().substring(0, 10)} onChange={handleInputChange} className="w-full rounded-xl border border-black/10 bg-zinc-50 p-3 text-sm" />
             </div>
 
-            {/* Champ Montant avec Bouton Caisse (UI/UX amélioré) */}
+            {/* Champ Montant avec Bouton Caisse */}
             <div>
               <label className="mb-1 block text-sm font-semibold">Montant (Ar)</label>
               <div className="relative">
@@ -254,21 +254,18 @@ const ModalForm: React.FC<ModalFormProps> = ({ title, onSubmit, onClose, formDat
                   step="0.01"
                   value={formData.montant || ""}
                   onChange={handleInputChange}
-                  // Ajuster le padding-right (pr) pour faire de la place au bouton
-                  className="w-full rounded-xl border border-black/10 bg-zinc-50 p-3 text-sm pr-[150px] focus:border-blue-500"
+                  className="w-full rounded-xl border border-black/10 bg-zinc-50 p-3 text-sm pr-[100px] focus:border-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
                 {/* Bouton Caisse visible seulement pour l'ajout d'un Dépôt */}
                 {isNewDeposit && (
                   <button
                     type="button"
                     onClick={handleSetCaisseBalance}
-                    disabled={Number(formData.montant) === CAISSE_BALANCE}
-                    // Style du bouton amélioré : couleur Ambre, position absolue
-                    className="absolute right-1 top-1 bottom-1 flex items-center rounded-xl bg-amber-500 px-3 py-1.5 text-xs font-bold text-white shadow-md transition hover:bg-amber-600 hover:shadow-lg disabled:bg-zinc-300 disabled:shadow-none disabled:cursor-not-allowed"
-                    title={`Remplir avec le Solde de Caisse: ${CAISSE_BALANCE.toLocaleString('fr-FR')} Ar`}
+                    disabled={Number(formData.montant) === caisseBalance}
+                    className="absolute right-1 top-1 bottom-1 flex items-center rounded-xl bg-amber-500 px-4 py-1.5 text-xs font-bold text-white shadow-md transition hover:bg-amber-600 hover:shadow-lg disabled:bg-zinc-300 disabled:shadow-none disabled:cursor-not-allowed"
+                    title={`Remplir avec le Solde de Caisse: ${caisseBalance.toLocaleString('fr-FR')} Ar`}
                   >
                     CAISSE
-                    <span className="ml-1 text-[10px] opacity-80">({CAISSE_BALANCE.toLocaleString('fr-FR')})</span>
                   </button>
                 )}
               </div>
@@ -793,6 +790,7 @@ export default function BanquePage() {
           isRetrait={activeTab === "retrait"}
           isModification={isModifyModalOpen}
           showToast={showToast}
+          caisseBalance={caisseBalance}
         />
       )}
 
