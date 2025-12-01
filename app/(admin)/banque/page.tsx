@@ -132,9 +132,9 @@ function SecureSoldeCard({ soldeActuel, showToast }: { soldeActuel: number, show
           <BankIcon />
         </div>
         <div>
-          <p className="text-xs uppercase tracking-wider text-black/40">Solde Banque</p>
+          <p className="text-xs uppercase tracking-wider text-black/40">Sold en Banque</p>
           <p className={`text-xl font-bold transition-all duration-300 ${showSolde ? 'text-black' : 'text-zinc-400'}`}>
-            {showSolde ? `${soldeActuel.toLocaleString('fr-FR')} €` : '****'}
+            {showSolde ? `${Math.abs(soldeActuel).toLocaleString('fr-FR')} ARIARY` : '****'}
           </p>
         </div>
         <button

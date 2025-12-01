@@ -207,7 +207,7 @@ export default function TransactionsPage() {
         id: t.id.toString(),
         date: formatDate(t.dateTransaction),
         description: t.description || t.type,
-        montant: t.montant,
+        montant: parseFloat(t.montant), // CRITICAL: Parse as number to prevent string concatenation
         montantAffiche: t.type === 'RECETTE' ? `+${formatCurrency(t.montant)}` : `-${formatCurrency(t.montant)}`,
         type: t.type === 'RECETTE' ? 'Revenu' : 'Dépense',
         categorie: t.categorie?.nom || 'Inconnue',
@@ -373,9 +373,10 @@ export default function TransactionsPage() {
 
   const totalMontant = useMemo(() => {
     // Calculer le total en tenant compte du type (Revenu = +, Dépense = -)
-    // Note: t.montant est déjà positif, mais on doit l'ajuster selon le type pour le total
+    // CRITICAL: Use parseFloat to ensure numeric addition, not string concatenation
     return filteredTransactions.reduce((sum, t) => {
-      return t.type === 'Revenu' ? sum + t.montant : sum - t.montant;
+      const amount = parseFloat(t.montant.toString());
+      return t.type === 'Revenu' ? sum + amount : sum - amount;
     }, 0);
   }, [filteredTransactions]);
 
@@ -394,7 +395,7 @@ export default function TransactionsPage() {
   const isCaisseDisabled =
     formData.type === "Dépense" && montantNumber > soldeCaisse;
   const showNumeroCheque =
-    formData.type === "Dépense" && formData.compte === "Banque A";
+    formData.type === "Dépense" && formData.compte.toLowerCase().includes("banque");
 
   // --- Security & Modify Logic
 

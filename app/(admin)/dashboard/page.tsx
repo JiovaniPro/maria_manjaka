@@ -220,7 +220,7 @@ export default function DashboardPage() {
         const comptesData = comptesResponse.data.data;
 
         // 3. Récupérer les dernières transactions
-        const transactionsResponse = await api.get('/transactions?limit=5');
+        const transactionsResponse = await api.get('/transactions?limit=3');
         const transactionsData = transactionsResponse.data.data;
 
         // Préparer les cartes financières
@@ -259,8 +259,8 @@ export default function DashboardPage() {
         // Préparer la liste des transactions
         setTransactions(transactionsData.map((t: any) => ({
           date: formatDate(t.dateTransaction),
-          description: t.description || t.type,
-          montant: formatCurrency(t.montant),
+              description: t.description || t.type,
+                montant: formatCurrency(t.montant),
         })));
 
         // Préparer la liste des comptes
@@ -378,7 +378,10 @@ export default function DashboardPage() {
           <article className="rounded-3xl border border-black/5 bg-white p-6 shadow-[0_15px_45px_rgba(0,0,0,0.05)]">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold">Dernières Transactions</h3>
-              <button className="cursor-pointer text-xs uppercase tracking-[0.3em] text-black/40 transition hover:text-black hover:underline">
+              <button 
+                onClick={() => router.push('/transaction')}
+                className="cursor-pointer text-xs uppercase tracking-[0.3em] text-black/40 transition hover:text-black hover:underline"
+              >
                 Voir tout
               </button>
             </div>
@@ -427,7 +430,7 @@ export default function DashboardPage() {
 }
 
 // Composants graphiques
-function TrendChart({ data }: { data: typeof trendData }) {
+function TrendChart({ data }: { data: TrendData }) {
   const maxValue = Math.max(...data.revenues, ...data.expenses);
   const chartHeight = 250;
   const chartWidth = 400;

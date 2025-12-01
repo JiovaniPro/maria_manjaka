@@ -117,8 +117,8 @@ export function TransactionForm({
                                 name="montant"
                                 value={formData.montant}
                                 onChange={handleInputChange}
-                                min="0.01"
-                                step="0.01"
+                                min="1"
+                                step="1"
                                 required
                                 key="montant-input"
                                 className="w-full rounded-xl border border-black/10 bg-zinc-50 p-3 text-sm focus:border-blue-500 focus:ring-blue-500"
