@@ -365,11 +365,12 @@ export default function BanquePage() {
       const accountsRes = await api.get('/comptes');
       const accounts = accountsRes.data.data;
 
-      const banque = accounts.find((acc: any) => acc.type === 'BANQUE' || acc.nom.toLowerCase().includes('banque'));
-      const caisse = accounts.find((acc: any) => acc.type === 'CAISSE' || acc.nom.toLowerCase().includes('caisse'));
+      // Prioriser le type plutôt que le nom
+      const banque = accounts.find((acc: any) => acc.type === 'BANQUE');
+      const caisse = accounts.find((acc: any) => acc.type === 'CAISSE');
 
       if (caisse) {
-        setCaisseBalance(parseFloat(caisse.soldeActuel));
+        setCaisseBalance(parseFloat(caisse.soldeActuel || 0));
       }
 
       if (banque) {

@@ -215,19 +215,28 @@ export default function DashboardPage() {
         const statsResponse = await api.get(`/transactions/stats?dateDebut=${startOfMonth}&dateFin=${endOfMonth}`);
         const stats = statsResponse.data.data;
 
-        // 2. Récupérer les comptes
-        const comptesResponse = await api.get('/comptes');
-        const comptesData = comptesResponse.data.data;
+        // 2. Récupérer les comptes par type (CAISSE et BANQUE)
+        const [comptesCaisseResponse, comptesBanqueResponse, allComptesResponse] = await Promise.all([
+          api.get('/comptes?type=CAISSE'),
+          api.get('/comptes?type=BANQUE'),
+          api.get('/comptes')
+        ]);
+
+        const comptesCaisse = comptesCaisseResponse.data.data || [];
+        const comptesBanque = comptesBanqueResponse.data.data || [];
+        const comptesData = allComptesResponse.data.data || [];
 
         // 3. Récupérer les dernières transactions
         const transactionsResponse = await api.get('/transactions?limit=3');
         const transactionsData = transactionsResponse.data.data;
 
-        // Préparer les cartes financières
-        const soldeBanque = comptesData.find((c: any) => c.nom.toLowerCase().includes('banque'))?.solde || 0;
-        const soldeCaisse = comptesData.find((c: any) => c.nom.toLowerCase().includes('caisse'))?.solde || 0;
-        // Si pas de compte spécifique trouvé, on prend le total ou le premier
-        const totalSolde = comptesData.reduce((acc: number, c: any) => acc + parseFloat(c.solde), 0);
+        // Calculer les soldes totaux par type
+        const soldeCaisse = comptesCaisse.reduce((acc: number, c: any) => 
+          acc + parseFloat(c.soldeActuel || 0), 0
+        );
+        const soldeBanque = comptesBanque.reduce((acc: number, c: any) => 
+          acc + parseFloat(c.soldeActuel || 0), 0
+        );
 
         setFinancialCards([
           {
@@ -266,7 +275,7 @@ export default function DashboardPage() {
         // Préparer la liste des comptes
         setAccounts(comptesData.map((c: any) => ({
           name: c.nom,
-          solde: formatCurrency(c.solde),
+          solde: formatCurrency(c.soldeActuel || 0),
         })));
 
       } catch (error) {

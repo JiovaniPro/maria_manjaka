@@ -226,11 +226,21 @@ export default function TransactionsPage() {
 
       // Map Accounts
       setAccountsData(comptesApi);
-      const caisse = comptesApi.find((c: any) => c.nom.toLowerCase().includes('caisse'));
-      const banque = comptesApi.find((c: any) => c.nom.toLowerCase().includes('banque'));
+      
+      // Trouver les comptes par type (plus fiable que par nom)
+      const caisse = comptesApi.find((c: any) => c.type === 'CAISSE');
+      const banque = comptesApi.find((c: any) => c.type === 'BANQUE');
 
-      setSoldeCaisse(caisse ? parseFloat(caisse.solde) : 0);
-      setSoldeBanque(banque ? parseFloat(banque.solde) : 0);
+      // Calculer les soldes totaux par type (au cas où il y aurait plusieurs comptes)
+      const soldeCaisseTotal = comptesApi
+        .filter((c: any) => c.type === 'CAISSE')
+        .reduce((acc: number, c: any) => acc + parseFloat(c.soldeActuel || 0), 0);
+      const soldeBanqueTotal = comptesApi
+        .filter((c: any) => c.type === 'BANQUE')
+        .reduce((acc: number, c: any) => acc + parseFloat(c.soldeActuel || 0), 0);
+
+      setSoldeCaisse(soldeCaisseTotal);
+      setSoldeBanque(soldeBanqueTotal);
 
       setTransactions(mappedTransactions);
       setCategoriesData(mappedCategories);
