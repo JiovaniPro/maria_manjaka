@@ -134,7 +134,7 @@ function SecureSoldeCard({ soldeActuel, showToast }: { soldeActuel: number, show
         <div>
           <p className="text-xs uppercase tracking-wider text-black/40">Sold en Banque</p>
           <p className={`text-xl font-bold transition-all duration-300 ${showSolde ? 'text-black' : 'text-zinc-400'}`}>
-            {showSolde ? `${Math.abs(soldeActuel).toLocaleString('fr-FR')} ARIARY` : '****'}
+            {showSolde ? `${Math.abs(soldeActuel).toLocaleString('fr-FR')} Ar` : '****'}
           </p>
         </div>
         <button
@@ -191,7 +191,7 @@ function TotalFilterCard({ total, activeTab }: { total: number, activeTab: "retr
     <div className={`flex flex-col rounded-3xl border-2 p-5 shadow-sm min-w-[200px] ${cardClass}`}>
       <p className="text-xs uppercase tracking-wider opacity-80">{title}</p>
       <p className="text-2xl font-bold mt-1">
-        {displayTotal.toLocaleString('fr-FR')} €
+        {displayTotal.toLocaleString('fr-FR')} Ar
       </p>
     </div>
   );
@@ -226,7 +226,7 @@ const ModalForm: React.FC<ModalFormProps> = ({ title, onSubmit, onClose, formDat
   const handleSetCaisseBalance = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     setFormData((prev) => ({ ...prev, montant: CAISSE_BALANCE }));
-    showToast(`Montant Caisse (${CAISSE_BALANCE.toLocaleString('fr-FR')} €) pré-rempli.`, "info");
+    showToast(`Montant Caisse (${CAISSE_BALANCE.toLocaleString('fr-FR')} Ar) pré-rempli.`, "info");
   };
 
   return (
@@ -245,7 +245,7 @@ const ModalForm: React.FC<ModalFormProps> = ({ title, onSubmit, onClose, formDat
 
             {/* Champ Montant avec Bouton Caisse (UI/UX amélioré) */}
             <div>
-              <label className="mb-1 block text-sm font-semibold">Montant (€)</label>
+              <label className="mb-1 block text-sm font-semibold">Montant (Ar)</label>
               <div className="relative">
                 <input
                   type="number"
@@ -265,7 +265,7 @@ const ModalForm: React.FC<ModalFormProps> = ({ title, onSubmit, onClose, formDat
                     disabled={Number(formData.montant) === CAISSE_BALANCE}
                     // Style du bouton amélioré : couleur Ambre, position absolue
                     className="absolute right-1 top-1 bottom-1 flex items-center rounded-xl bg-amber-500 px-3 py-1.5 text-xs font-bold text-white shadow-md transition hover:bg-amber-600 hover:shadow-lg disabled:bg-zinc-300 disabled:shadow-none disabled:cursor-not-allowed"
-                    title={`Remplir avec le Solde de Caisse: ${CAISSE_BALANCE.toLocaleString('fr-FR')} €`}
+                    title={`Remplir avec le Solde de Caisse: ${CAISSE_BALANCE.toLocaleString('fr-FR')} Ar`}
                   >
                     CAISSE
                     <span className="ml-1 text-[10px] opacity-80">({CAISSE_BALANCE.toLocaleString('fr-FR')})</span>
@@ -365,12 +365,11 @@ export default function BanquePage() {
       const accountsRes = await api.get('/comptes');
       const accounts = accountsRes.data.data;
 
-      // Prioriser le type plutôt que le nom
-      const banque = accounts.find((acc: any) => acc.type === 'BANQUE');
-      const caisse = accounts.find((acc: any) => acc.type === 'CAISSE');
+      const banque = accounts.find((acc: any) => acc.type === 'BANQUE' || acc.nom.toLowerCase().includes('banque'));
+      const caisse = accounts.find((acc: any) => acc.type === 'CAISSE' || acc.nom.toLowerCase().includes('caisse'));
 
       if (caisse) {
-        setCaisseBalance(parseFloat(caisse.soldeActuel || 0));
+        setCaisseBalance(parseFloat(caisse.soldeActuel));
       }
 
       if (banque) {
@@ -510,14 +509,14 @@ export default function BanquePage() {
 
     // Validation Solde Caisse pour Dépôt
     if (type === "Dépôt" && montant > caisseBalance) {
-      showToast(`Impossible: Solde de caisse insuffisant (${caisseBalance.toLocaleString('fr-FR')} €) pour ce dépôt.`, "error");
+      showToast(`Impossible: Solde de caisse insuffisant (${caisseBalance.toLocaleString('fr-FR')} Ar) pour ce dépôt.`, "error");
       return;
     }
 
     // Validation Solde Banque pour Retrait
     const soldeBanque = parseFloat(bankAccount.soldeActuel.toString());
     if (type === "Retrait" && montant > soldeBanque) {
-      showToast(`Impossible: Solde bancaire insuffisant (${soldeBanque.toLocaleString('fr-FR')} €) pour ce retrait.`, "error");
+      showToast(`Impossible: Solde bancaire insuffisant (${soldeBanque.toLocaleString('fr-FR')} Ar) pour ce retrait.`, "error");
       return;
     }
 
@@ -732,7 +731,7 @@ export default function BanquePage() {
 
                     {/* Cellule Montant colorée */}
                     <td className={`px-6 py-4 text-sm font-bold ${item.montant < 0 ? "text-red-600" : "text-emerald-600"}`}>
-                      {item.montant > 0 ? "+" : ""}{Math.abs(item.montant).toLocaleString('fr-FR')} €
+                      {item.montant > 0 ? "+" : ""}{Math.abs(item.montant).toLocaleString('fr-FR')} Ar
                     </td>
 
                     <td className="px-6 py-4 text-sm text-black/60">
