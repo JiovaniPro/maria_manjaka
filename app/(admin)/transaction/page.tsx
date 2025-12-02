@@ -1,7 +1,7 @@
 // src/app/(admin)/transaction/page.tsx
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/components/ToastContainer";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -180,6 +180,7 @@ export default function TransactionsPage() {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('fr-MG', { style: 'currency', currency: 'MGA' }).format(amount);
   };
+
 
   const formatDate = (dateString: string) => {
     return dateString.split('T')[0];
@@ -704,7 +705,10 @@ export default function TransactionsPage() {
 
       {/* Résumé des totaux */}
       <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-        <div className="flex items-center gap-4 rounded-3xl border border-black/5 bg-white p-6 shadow-sm">
+        <div 
+          id="total-card"
+          className="flex items-center gap-4 rounded-3xl border border-black/5 bg-white p-6 shadow-sm"
+        >
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-500">
             <CalculatorIcon />
           </div>
@@ -723,7 +727,10 @@ export default function TransactionsPage() {
       </div>
 
       {/* Table des Transactions */}
-      <div className="overflow-hidden rounded-3xl border border-black/5 bg-white shadow-[0_15px_45px_rgba(0,0,0,0.05)]">
+      <div 
+        id="transactions-table"
+        className="overflow-hidden rounded-3xl border border-black/5 bg-white shadow-[0_15px_45px_rgba(0,0,0,0.05)]"
+      >
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="bg-zinc-50 text-black/60">

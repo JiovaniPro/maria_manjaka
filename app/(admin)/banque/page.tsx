@@ -719,7 +719,7 @@ export default function BanquePage() {
                       <td className="px-6 py-4">
                         <span className="inline-flex items-center gap-2 rounded-lg bg-red-50 px-3 py-1.5 font-mono text-xs font-bold text-red-700">
                           <CheckIcon />
-                          {item.numeroCheque}
+                          {item.numeroCheque ? `CHQ-${item.numeroCheque}` : 'N/A'}
                         </span>
                       </td>
                     )}

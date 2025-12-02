@@ -390,7 +390,9 @@ export default function CategoriesPage() {
                   className="border-b border-black/5 transition hover:bg-zinc-50/50"
                 >
                   <td className="px-6 py-4 text-sm font-medium">{category.nom}</td>
-                  <td className="px-6 py-4 text-sm text-black/60">{category.code}</td>
+                  <td className="px-6 py-4 text-sm text-black/60">
+                    {category.type === "Recette" ? "A" : "B"}{category.code}
+                  </td>
                   <td className="px-6 py-4">
                     <span
                       className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${category.statut === "actif"

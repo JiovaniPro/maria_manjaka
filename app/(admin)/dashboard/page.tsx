@@ -45,6 +45,119 @@ type TrendData = {
 
 const SECRET_PASSWORD = "1234"; // Simulation
 
+function SecureAccountCard({
+  account,
+  showToast,
+}: {
+  account: Account;
+  showToast: (msg: string, type: "success" | "error" | "warning") => void;
+}) {
+  const [showSolde, setShowSolde] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [password, setPassword] = useState("");
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const clearSoldeTimeout = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (showSolde) {
+      clearSoldeTimeout();
+      timeoutRef.current = setTimeout(() => {
+        setShowSolde(false);
+        showToast("Solde masqué par sécurité.", "warning");
+      }, 30000);
+      return () => clearSoldeTimeout();
+    }
+  }, [showSolde, showToast, clearSoldeTimeout]);
+
+  const handleToggle = () => {
+    if (showSolde) {
+      setShowSolde(false);
+      clearSoldeTimeout();
+    } else {
+      setIsAuthModalOpen(true);
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password === SECRET_PASSWORD) {
+      setShowSolde(true);
+      setIsAuthModalOpen(false);
+      setPassword("");
+      showToast("Solde affiché.", "success");
+    } else {
+      showToast("Mot de passe incorrect.", "error");
+      setPassword("");
+    }
+  };
+
+  return (
+    <>
+      <div className="flex items-center justify-between rounded-2xl border border-black/5 px-4 py-3 transition hover:bg-zinc-50">
+        <div>
+          <p className="text-sm font-medium">{account.name}</p>
+          <p className="text-xs text-black/50">Solde actuel</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-semibold">
+            {showSolde ? account.solde : "****"}
+          </p>
+          <button
+            onClick={handleToggle}
+            className="rounded-full p-1 text-black/40 transition hover:bg-zinc-100 hover:text-blue-500"
+          >
+            {showSolde ? <EyeOffIcon /> : <EyeIcon />}
+          </button>
+        </div>
+      </div>
+
+      {isAuthModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-3xl border border-black/10 bg-white p-8 shadow-2xl">
+            <h2 className="mb-6 text-xl font-bold text-blue-600">
+              Accès Sécurisé
+            </h2>
+            <p className="mb-4 text-sm text-black/60">
+              Entrez le code pour afficher le solde.
+            </p>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full rounded-xl border border-black/10 bg-zinc-50 p-3 text-center text-lg tracking-widest focus:border-blue-500"
+                placeholder="••••"
+                autoFocus
+              />
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAuthModalOpen(false)}
+                  className="rounded-xl px-4 py-2 text-sm font-medium text-black/60 hover:bg-zinc-50"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-xl bg-blue-500 px-6 py-2 text-sm font-medium text-white hover:bg-blue-600"
+                >
+                  Afficher
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 function SecureFinancialCard({
   card,
   showToast,
@@ -177,6 +290,11 @@ export default function DashboardPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [revenueBreakdown, setRevenueBreakdown] = useState<RevenueBreakdown[]>([]);
+  const [trendData, setTrendData] = useState<TrendData>({
+    months: [],
+    revenues: [],
+    expenses: [],
+  });
   const [loadingData, setLoadingData] = useState(true);
 
   // Palette de couleurs pour les catégories
@@ -193,12 +311,6 @@ export default function DashboardPage() {
     "#f59e0b", // ambre
   ];
 
-  const trendData: TrendData = {
-    months: ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul"],
-    revenues: [160, 130, 120, 80, 90, 50, 70],
-    expenses: [120, 110, 140, 130, 150, 120, 100],
-  };
-
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('fr-MG', { style: 'currency', currency: 'MGA' }).format(amount);
   };
@@ -214,9 +326,9 @@ export default function DashboardPage() {
         setLoadingData(true);
 
         // 1. Récupérer les stats du mois
-        const now = new Date();
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString();
+        const currentDate = new Date();
+        const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).toISOString();
+        const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).toISOString();
 
         const statsResponse = await api.get(`/transactions/stats?dateDebut=${startOfMonth}&dateFin=${endOfMonth}`);
         const stats = statsResponse.data.data;
@@ -241,6 +353,42 @@ export default function DashboardPage() {
           `/transactions?type=RECETTE&dateDebut=${startOfMonth}&dateFin=${endOfMonth}&limit=1000`
         );
         const recettesData = recettesResponse.data.data || [];
+
+        // 5. Récupérer les transactions des 7 derniers mois pour le graphique des tendances
+        const monthsData: { month: string; revenues: number; expenses: number }[] = [];
+        
+        for (let i = 6; i >= 0; i--) {
+          const monthDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
+          const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1).toISOString();
+          const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).toISOString();
+          
+          const monthName = monthDate.toLocaleDateString('fr-FR', { month: 'short' });
+          
+          // Récupérer les transactions du mois
+          const [monthRecettes, monthDepenses] = await Promise.all([
+            api.get(`/transactions?type=RECETTE&dateDebut=${monthStart}&dateFin=${monthEnd}&limit=1000`),
+            api.get(`/transactions?type=DEPENSE&dateDebut=${monthStart}&dateFin=${monthEnd}&limit=1000`)
+          ]);
+          
+          const totalRecettes = monthRecettes.data.data.reduce((sum: number, t: any) => 
+            sum + parseFloat(t.montant || 0), 0
+          );
+          const totalDepenses = monthDepenses.data.data.reduce((sum: number, t: any) => 
+            sum + parseFloat(t.montant || 0), 0
+          );
+          
+          monthsData.push({
+            month: monthName,
+            revenues: totalRecettes / 1000, // Convertir en milliers pour l'affichage
+            expenses: totalDepenses / 1000,
+          });
+        }
+        
+        setTrendData({
+          months: monthsData.map(d => d.month),
+          revenues: monthsData.map(d => d.revenues),
+          expenses: monthsData.map(d => d.expenses),
+        });
 
         // Calculer les soldes totaux par type
         const soldeCaisse = comptesCaisse.reduce((acc: number, c: any) => 
@@ -333,8 +481,8 @@ export default function DashboardPage() {
     <div>
       <header className="flex flex-wrap items-center justify-between gap-6">
         <div>
-          <p className="text-sm text-black/60">Hi, Pasteur Jean!</p>
-          <h1 className="text-2xl font-semibold">Welcome back to Dashboard</h1>
+          <p className="text-sm text-black/60">Bonjour, admin</p>
+          <h1 className="text-2xl font-semibold">Bienvenue sur le tableau de bord</h1>
         </div>
         <div className="flex w-full max-w-sm items-center gap-3 rounded-full border border-black/10 bg-white px-4 py-2">
           <SearchIcon />
@@ -464,18 +612,27 @@ export default function DashboardPage() {
               </button>
             </div>
             <div className="mt-4 space-y-4">
-              {accounts.map((account) => (
-                <div
-                  key={account.name}
-                  className="flex items-center justify-between rounded-2xl border border-black/5 px-4 py-3 transition hover:bg-zinc-50"
-                >
-                  <div>
-                    <p className="text-sm font-medium">{account.name}</p>
-                    <p className="text-xs text-black/50">Solde actuel</p>
+              {accounts.map((account) => {
+                const isBanque = account.name.toLowerCase().includes('banque');
+                return isBanque ? (
+                  <SecureAccountCard
+                    key={account.name}
+                    account={account}
+                    showToast={showToast}
+                  />
+                ) : (
+                  <div
+                    key={account.name}
+                    className="flex items-center justify-between rounded-2xl border border-black/5 px-4 py-3 transition hover:bg-zinc-50"
+                  >
+                    <div>
+                      <p className="text-sm font-medium">{account.name}</p>
+                      <p className="text-xs text-black/50">Solde actuel</p>
+                    </div>
+                    <p className="text-sm font-semibold">{account.solde}</p>
                   </div>
-                  <p className="text-sm font-semibold">{account.solde}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </article>
         </div>
@@ -486,30 +643,54 @@ export default function DashboardPage() {
 
 // Composants graphiques
 function TrendChart({ data }: { data: TrendData }) {
+  const [hoveredPoint, setHoveredPoint] = useState<{ month: string; revenue: number; expense: number; x: number; y: number } | null>(null);
   const maxValue = Math.max(...data.revenues, ...data.expenses);
   const chartHeight = 250;
   const chartWidth = 400;
   const padding = { top: 20, right: 30, bottom: 40, left: 50 };
   const graphHeight = chartHeight - padding.top - padding.bottom;
   const graphWidth = chartWidth - padding.left - padding.right;
+  
+  const formatAmount = (value: number) => {
+    const amount = value * 1000;
+    const formatted = amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    return `${formatted} Ar`;
+  };
 
   const pointsRevenues = data.revenues
     .map((value, index) => {
       const x =
         padding.left + (index * graphWidth) / (data.revenues.length - 1);
       const y = padding.top + graphHeight - (value / maxValue) * graphHeight;
-      return `${x},${y}`;
-    })
-    .join(" ");
+      return { x, y, value, month: data.months[index] };
+    });
 
   const pointsExpenses = data.expenses
     .map((value, index) => {
       const x =
         padding.left + (index * graphWidth) / (data.expenses.length - 1);
       const y = padding.top + graphHeight - (value / maxValue) * graphHeight;
-      return `${x},${y}`;
-    })
-    .join(" ");
+      return { x, y, value, month: data.months[index] };
+    });
+  
+  const handlePointHover = (index: number) => {
+    const revenuePoint = pointsRevenues[index];
+    const expensePoint = pointsExpenses[index];
+    setHoveredPoint({
+      month: revenuePoint.month,
+      revenue: revenuePoint.value,
+      expense: expensePoint.value,
+      x: revenuePoint.x,
+      y: revenuePoint.y - 20
+    });
+  };
+  
+  const handlePointLeave = () => {
+    setHoveredPoint(null);
+  };
+  
+  const revenuePath = pointsRevenues.map(p => `${p.x},${p.y}`).join(" ");
+  const expensePath = pointsExpenses.map(p => `${p.x},${p.y}`).join(" ");
 
   return (
     <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="h-full w-full">
@@ -571,7 +752,7 @@ function TrendChart({ data }: { data: TrendData }) {
 
       {/* Ligne Revenus */}
       <polyline
-        points={pointsRevenues}
+        points={revenuePath}
         fill="none"
         stroke="#16a34a"
         strokeWidth="3"
@@ -580,7 +761,7 @@ function TrendChart({ data }: { data: TrendData }) {
       />
       {/* Ligne Dépenses */}
       <polyline
-        points={pointsExpenses}
+        points={expensePath}
         fill="none"
         stroke="#ef4444"
         strokeWidth="3"
@@ -588,6 +769,72 @@ function TrendChart({ data }: { data: TrendData }) {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+      
+      {/* Points interactifs pour tooltips */}
+      {pointsRevenues.map((point, index) => (
+        <g key={`point-${index}`}>
+          <circle
+            cx={point.x}
+            cy={point.y}
+            r="6"
+            fill="#16a34a"
+            className="cursor-pointer"
+            onMouseEnter={() => handlePointHover(index)}
+            onMouseLeave={handlePointLeave}
+          />
+          <circle
+            cx={pointsExpenses[index].x}
+            cy={pointsExpenses[index].y}
+            r="6"
+            fill="#ef4444"
+            className="cursor-pointer"
+            onMouseEnter={() => handlePointHover(index)}
+            onMouseLeave={handlePointLeave}
+          />
+        </g>
+      ))}
+      
+      {/* Tooltip */}
+      {hoveredPoint && (
+        <g>
+          <rect
+            x={hoveredPoint.x - 80}
+            y={hoveredPoint.y - 50}
+            width="160"
+            height="45"
+            fill="rgba(0, 0, 0, 0.85)"
+            rx="8"
+          />
+          <text
+            x={hoveredPoint.x}
+            y={hoveredPoint.y - 35}
+            textAnchor="middle"
+            fontSize="10"
+            fill="white"
+            fontWeight="bold"
+          >
+            {hoveredPoint.month}
+          </text>
+          <text
+            x={hoveredPoint.x}
+            y={hoveredPoint.y - 20}
+            textAnchor="middle"
+            fontSize="9"
+            fill="#86efac"
+          >
+            Revenus: {formatAmount(hoveredPoint.revenue)}
+          </text>
+          <text
+            x={hoveredPoint.x}
+            y={hoveredPoint.y - 5}
+            textAnchor="middle"
+            fontSize="9"
+            fill="#fca5a5"
+          >
+            Dépenses: {formatAmount(hoveredPoint.expense)}
+          </text>
+        </g>
+      )}
 
       {/* Label Axe Y */}
       <text
@@ -620,12 +867,15 @@ function DonutChart({
 }: {
   data: { label: string; value: number; color: string }[];
 }) {
+  const [hoveredSegment, setHoveredSegment] = useState<{ label: string; value: number; color: string; x: number; y: number } | null>(null);
   const radius = 70;
   const innerRadius = 45;
   const circumference = 2 * Math.PI * radius;
   const total = data.reduce((sum, item) => sum + item.value, 0);
   let accumulated = 0;
   const startOffset = circumference * 0.25;
+  const centerX = 100;
+  const centerY = 100;
 
   return (
     <svg viewBox="0 0 200 200" className="h-56 w-56">
@@ -637,9 +887,12 @@ function DonutChart({
         stroke="rgba(0,0,0,0.05)"
         strokeWidth="25"
       />
-      {data.map((item) => {
+      {data.map((item, index) => {
         const dash = (item.value / total) * circumference;
         const dashOffset = startOffset - accumulated;
+        const angle = (accumulated + dash / 2) / circumference * 2 * Math.PI - Math.PI / 2;
+        const segmentX = centerX + Math.cos(angle) * radius;
+        const segmentY = centerY + Math.sin(angle) * radius;
         accumulated += dash;
 
         return (
@@ -654,9 +907,52 @@ function DonutChart({
             strokeDasharray={`${dash} ${circumference - dash}`}
             strokeDashoffset={dashOffset}
             strokeLinecap="round"
+            className="cursor-pointer transition-opacity"
+            style={{ opacity: hoveredSegment?.label === item.label ? 1 : hoveredSegment ? 0.5 : 1 }}
+            onMouseEnter={() => {
+              setHoveredSegment({
+                ...item,
+                x: segmentX,
+                y: segmentY
+              });
+            }}
+            onMouseLeave={() => setHoveredSegment(null)}
           />
         );
       })}
+      
+      {/* Tooltip pour le donut */}
+      {hoveredSegment && (
+        <g>
+          <rect
+            x={hoveredSegment.x - 60}
+            y={hoveredSegment.y - 35}
+            width="120"
+            height="30"
+            fill="rgba(0, 0, 0, 0.85)"
+            rx="6"
+          />
+          <text
+            x={hoveredSegment.x}
+            y={hoveredSegment.y - 18}
+            textAnchor="middle"
+            fontSize="10"
+            fill="white"
+            fontWeight="bold"
+          >
+            {hoveredSegment.label}
+          </text>
+          <text
+            x={hoveredSegment.x}
+            y={hoveredSegment.y - 5}
+            textAnchor="middle"
+            fontSize="9"
+            fill={hoveredSegment.color}
+          >
+            {hoveredSegment.value}% du total
+          </text>
+        </g>
+      )}
       <circle cx="100" cy="100" r={innerRadius} fill="white" />
       <text
         x="100"
