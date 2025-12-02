@@ -333,16 +333,13 @@ export default function DashboardPage() {
         const statsResponse = await api.get(`/transactions/stats?dateDebut=${startOfMonth}&dateFin=${endOfMonth}`);
         const stats = statsResponse.data.data;
 
-        // 2. Récupérer les comptes par type (CAISSE et BANQUE)
-        const [comptesCaisseResponse, comptesBanqueResponse, allComptesResponse] = await Promise.all([
-          api.get('/comptes?type=CAISSE'),
-          api.get('/comptes?type=BANQUE'),
-          api.get('/comptes')
-        ]);
-
-        const comptesCaisse = comptesCaisseResponse.data.data || [];
-        const comptesBanque = comptesBanqueResponse.data.data || [];
+        // 2. Récupérer tous les comptes en une seule requête (optimisation)
+        const allComptesResponse = await api.get('/comptes');
         const comptesData = allComptesResponse.data.data || [];
+        
+        // Filtrer côté frontend
+        const comptesCaisse = comptesData.filter((c: any) => c.type === 'CAISSE');
+        const comptesBanque = comptesData.filter((c: any) => c.type === 'BANQUE');
 
         // 3. Récupérer les dernières transactions
         const transactionsResponse = await api.get('/transactions?limit=3');
@@ -355,33 +352,65 @@ export default function DashboardPage() {
         const recettesData = recettesResponse.data.data || [];
 
         // 5. Récupérer les transactions des 7 derniers mois pour le graphique des tendances
-        const monthsData: { month: string; revenues: number; expenses: number }[] = [];
+        // OPTIMISATION: 2 requêtes globales au lieu de 14 (7 mois × 2 types)
+        const startDate7Months = new Date(currentDate.getFullYear(), currentDate.getMonth() - 6, 1);
+        const endDate7Months = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+        const globalStart = startDate7Months.toISOString();
+        const globalEnd = endDate7Months.toISOString();
         
+        // 2 requêtes globales pour toutes les transactions des 7 derniers mois
+        const [allRecettesResponse, allDepensesResponse] = await Promise.all([
+          api.get(`/transactions?type=RECETTE&dateDebut=${globalStart}&dateFin=${globalEnd}&limit=10000`),
+          api.get(`/transactions?type=DEPENSE&dateDebut=${globalStart}&dateFin=${globalEnd}&limit=10000`)
+        ]);
+        
+        const allRecettes = allRecettesResponse.data.data || [];
+        const allDepenses = allDepensesResponse.data.data || [];
+        
+        // Grouper par mois côté frontend
+        const monthsData: { month: string; revenues: number; expenses: number }[] = [];
+        const monthMap = new Map<string, { revenues: number; expenses: number; monthName: string }>();
+        
+        // Initialiser les 7 mois
         for (let i = 6; i >= 0; i--) {
           const monthDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
-          const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1).toISOString();
-          const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).toISOString();
-          
+          const monthKey = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`;
           const monthName = monthDate.toLocaleDateString('fr-FR', { month: 'short' });
-          
-          // Récupérer les transactions du mois
-          const [monthRecettes, monthDepenses] = await Promise.all([
-            api.get(`/transactions?type=RECETTE&dateDebut=${monthStart}&dateFin=${monthEnd}&limit=1000`),
-            api.get(`/transactions?type=DEPENSE&dateDebut=${monthStart}&dateFin=${monthEnd}&limit=1000`)
-          ]);
-          
-          const totalRecettes = monthRecettes.data.data.reduce((sum: number, t: any) => 
-            sum + parseFloat(t.montant || 0), 0
-          );
-          const totalDepenses = monthDepenses.data.data.reduce((sum: number, t: any) => 
-            sum + parseFloat(t.montant || 0), 0
-          );
-          
-          monthsData.push({
-            month: monthName,
-            revenues: totalRecettes / 1000, // Convertir en milliers pour l'affichage
-            expenses: totalDepenses / 1000,
-          });
+          monthMap.set(monthKey, { revenues: 0, expenses: 0, monthName });
+        }
+        
+        // Grouper les recettes par mois
+        allRecettes.forEach((t: any) => {
+          const transactionDate = new Date(t.dateTransaction);
+          const monthKey = `${transactionDate.getFullYear()}-${String(transactionDate.getMonth() + 1).padStart(2, '0')}`;
+          const monthData = monthMap.get(monthKey);
+          if (monthData) {
+            monthData.revenues += parseFloat(t.montant || 0);
+          }
+        });
+        
+        // Grouper les dépenses par mois
+        allDepenses.forEach((t: any) => {
+          const transactionDate = new Date(t.dateTransaction);
+          const monthKey = `${transactionDate.getFullYear()}-${String(transactionDate.getMonth() + 1).padStart(2, '0')}`;
+          const monthData = monthMap.get(monthKey);
+          if (monthData) {
+            monthData.expenses += parseFloat(t.montant || 0);
+          }
+        });
+        
+        // Convertir en tableau trié par mois
+        for (let i = 6; i >= 0; i--) {
+          const monthDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
+          const monthKey = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`;
+          const monthData = monthMap.get(monthKey);
+          if (monthData) {
+            monthsData.push({
+              month: monthData.monthName,
+              revenues: monthData.revenues / 1000, // Convertir en milliers pour l'affichage
+              expenses: monthData.expenses / 1000,
+            });
+          }
         }
         
         setTrendData({
@@ -471,7 +500,8 @@ export default function DashboardPage() {
     };
 
     fetchData();
-  }, [showToast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Exécuter une seule fois au montage du composant
 
   if (isLoading || (loadingData && financialCards.length === 0)) {
     return <LoadingScreen />;
@@ -909,11 +939,19 @@ function DonutChart({
             strokeLinecap="round"
             className="cursor-pointer transition-opacity"
             style={{ opacity: hoveredSegment?.label === item.label ? 1 : hoveredSegment ? 0.5 : 1 }}
-            onMouseEnter={() => {
+            onMouseEnter={(e) => {
+              const svg = e.currentTarget.ownerSVGElement;
+              if (!svg) return;
+              const svgPoint = svg.createSVGPoint();
+              svgPoint.x = e.clientX;
+              svgPoint.y = e.clientY;
+              const ctm = svg.getScreenCTM();
+              if (!ctm) return;
+              const transformedPoint = svgPoint.matrixTransform(ctm.inverse());
               setHoveredSegment({
                 ...item,
-                x: segmentX,
-                y: segmentY
+                x: transformedPoint.x,
+                y: transformedPoint.y
               });
             }}
             onMouseLeave={() => setHoveredSegment(null)}
