@@ -62,6 +62,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch (error) {
             // Même en cas d'erreur sur le backend, on déconnecte localement
         } finally {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
             setToken(null);
             setUser(null);
         }

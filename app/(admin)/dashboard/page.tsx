@@ -643,8 +643,10 @@ export default function DashboardPage() {
             </div>
             <div className="mt-4 space-y-4">
               {accounts.map((account) => {
-                const isBanque = account.name.toLowerCase().includes('banque');
-                return isBanque ? (
+                const nameLower = account.name.toLowerCase();
+                const isSensitiveAccount =
+                  nameLower.includes('banque') || nameLower.includes('bni');
+                return isSensitiveAccount ? (
                   <SecureAccountCard
                     key={account.name}
                     account={account}
@@ -918,11 +920,13 @@ function DonutChart({
         strokeWidth="25"
       />
       {data.map((item, index) => {
-        const dash = (item.value / total) * circumference;
+        const dash = total > 0 ? (item.value / total) * circumference : 0;
         const dashOffset = startOffset - accumulated;
         const angle = (accumulated + dash / 2) / circumference * 2 * Math.PI - Math.PI / 2;
         const segmentX = centerX + Math.cos(angle) * radius;
         const segmentY = centerY + Math.sin(angle) * radius;
+        const tooltipX = centerX + Math.cos(angle) * (radius + 26);
+        const tooltipY = centerY + Math.sin(angle) * (radius + 26);
         accumulated += dash;
 
         return (
@@ -939,21 +943,13 @@ function DonutChart({
             strokeLinecap="round"
             className="cursor-pointer transition-opacity"
             style={{ opacity: hoveredSegment?.label === item.label ? 1 : hoveredSegment ? 0.5 : 1 }}
-            onMouseEnter={(e) => {
-              const svg = e.currentTarget.ownerSVGElement;
-              if (!svg) return;
-              const svgPoint = svg.createSVGPoint();
-              svgPoint.x = e.clientX;
-              svgPoint.y = e.clientY;
-              const ctm = svg.getScreenCTM();
-              if (!ctm) return;
-              const transformedPoint = svgPoint.matrixTransform(ctm.inverse());
+            onMouseEnter={() =>
               setHoveredSegment({
                 ...item,
-                x: transformedPoint.x,
-                y: transformedPoint.y
-              });
-            }}
+                x: tooltipX,
+                y: tooltipY
+              })
+            }
             onMouseLeave={() => setHoveredSegment(null)}
           />
         );

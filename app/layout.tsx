@@ -1,8 +1,9 @@
-"use client";
-
-import { ToastProvider } from '@/components/ToastContainer';
-import { Poppins } from "next/font/google";
-import './globals.css';
+ "use client";
+ 
+ import { ToastProvider } from '@/components/ToastContainer';
+ import { Poppins } from "next/font/google";
+ import './globals.css';
+ import { AuthProvider } from '@/contexts/AuthContext';
 
 const poppins = Poppins({
   subsets: ["latin"],
@@ -18,9 +19,11 @@ export default function RootLayout({
   return (
     <html lang="fr" className={poppins.variable}>
       <body className="font-poppins antialiased">
-        <ToastProvider>
-          {children}
-        </ToastProvider>
+        <AuthProvider>
+          <ToastProvider>
+            {children}
+          </ToastProvider>
+        </AuthProvider>
       </body>
     </html>
   );

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/components/ToastContainer";
+import { useAuth } from "@/contexts/AuthContext";
 import {
     DashboardIcon,
     TransactionsIcon,
@@ -31,12 +32,14 @@ export function Sidebar() {
     const pathname = usePathname();
     const router = useRouter();
     const { showToast } = useToast();
+    const { logout } = useAuth();
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
+        await logout();
         showToast("Déconnexion réussie", "success");
         setTimeout(() => {
-            router.push("/connexion");
-        }, 1000);
+            router.replace("/connexion");
+        }, 500);
     };
 
     return (
