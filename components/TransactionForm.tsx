@@ -32,6 +32,10 @@ type TransactionFormProps = {
     showNumeroCheque: boolean;
     soldeCaisse: number;
     soldeBanque: number;
+    lockCompte?: boolean;
+    lockedCompteName?: string;
+    showFacturePrompt?: boolean;
+    needsAdminPassword?: boolean;
 };
 
 export function TransactionForm({
@@ -48,7 +52,13 @@ export function TransactionForm({
     showNumeroCheque,
     soldeCaisse,
     soldeBanque,
+    lockCompte = false,
+    lockedCompteName,
+    showFacturePrompt = false,
+    needsAdminPassword = false,
 }: TransactionFormProps) {
+    const selectValue = lockCompte && lockedCompteName ? lockedCompteName : formData.compte;
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
             <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-black/10 bg-white p-8 shadow-2xl">
@@ -175,10 +185,11 @@ export function TransactionForm({
                             </label>
                             <select
                                 name="compte"
-                                value={formData.compte}
+                                value={selectValue}
                                 onChange={handleInputChange}
                                 required
-                                className="w-full rounded-xl border border-black/10 bg-zinc-50 p-3 text-sm focus:border-blue-500 focus:ring-blue-500"
+                                disabled={lockCompte}
+                                className="w-full rounded-xl border border-black/10 bg-zinc-50 p-3 text-sm focus:border-blue-500 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-zinc-100"
                             >
                                 <option value="" disabled>
                                     Sélectionner un compte
@@ -201,6 +212,11 @@ export function TransactionForm({
                                     );
                                 })}
                             </select>
+                            {lockCompte && (
+                                <p className="mt-2 text-xs text-black/50">
+                                    Compte verrouillé sur la caisse pour toutes les transactions.
+                                </p>
+                            )}
                         </div>
                     </div>
 
@@ -219,6 +235,44 @@ export function TransactionForm({
                                 className="w-full rounded-xl border border-red-500 bg-red-50 p-3 text-sm placeholder:text-red-300 focus:border-red-500 focus:ring-red-500"
                                 placeholder="Obligatoire pour un paiement par Banque A"
                             />
+                        </div>
+                    )}
+
+                    {/* Facture et override admin */}
+                    {showFacturePrompt && (
+                        <div className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                            <div>
+                                <label className="mb-1 block text-sm font-semibold text-black">
+                                    Numéro de facture (obligatoire au-delà de 20 000 Ar)
+                                </label>
+                                <input
+                                    type="text"
+                                    name="numeroFacture"
+                                    value={formData.numeroFacture}
+                                    onChange={handleInputChange}
+                                    required={!needsAdminPassword}
+                                    className="w-full rounded-xl border border-amber-300 bg-white p-3 text-sm focus:border-amber-500 focus:ring-amber-500"
+                                    placeholder="Ex: FAC-2025-001"
+                                />
+                            </div>
+                            {needsAdminPassword && (
+                                <div>
+                                    <label className="mb-1 block text-sm font-semibold text-black">
+                                        Mot de passe admin si aucune facture
+                                    </label>
+                                    <input
+                                        type="password"
+                                        name="adminPasswordOverride"
+                                        value={formData.adminPasswordOverride}
+                                        onChange={handleInputChange}
+                                        className="w-full rounded-xl border border-red-300 bg-white p-3 text-sm focus:border-red-500 focus:ring-red-500"
+                                        placeholder="Saisir le mot de passe pour valider sans facture"
+                                    />
+                                    <p className="mt-1 text-xs text-red-500">
+                                        Facture manquante : autorisation administrateur requise.
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     )}
 

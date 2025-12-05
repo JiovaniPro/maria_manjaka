@@ -903,7 +903,9 @@ function DonutChart({
   const radius = 70;
   const innerRadius = 45;
   const circumference = 2 * Math.PI * radius;
-  const total = data.reduce((sum, item) => sum + item.value, 0);
+  const rawTotal = data.reduce((sum, item) => sum + item.value, 0);
+  const total = rawTotal > 0 ? rawTotal : 1; // éviter division par 0 pour l'affichage
+  const displayTotal = 100; // Affiché au centre, toujours 100%
   let accumulated = 0;
   const startOffset = circumference * 0.25;
   const centerX = 100;
@@ -996,7 +998,7 @@ function DonutChart({
         fontWeight="bold"
         fill="black"
       >
-        {total}%
+        {displayTotal}%
       </text>
       <text
         x="100"

@@ -1,7 +1,7 @@
 // src/app/(admin)/transaction/page.tsx
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/components/ToastContainer";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -22,6 +22,8 @@ import {
   RefreshIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  EyeIcon,
+  CloseIcon,
 } from "@/components/Icons";
 
 // ====================================================================
@@ -153,6 +155,9 @@ export default function TransactionsPage() {
   // --- Add/Modify Modal States
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isModifyModalOpen, setIsModifyModalOpen] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [selectedTransactionToView, setSelectedTransactionToView] =
+    useState<Transaction | null>(null);
   const [selectedTransactionToModify, setSelectedTransactionToModify] =
     useState<Transaction | null>(null);
   const [formData, setFormData] = useState({
@@ -164,6 +169,8 @@ export default function TransactionsPage() {
     categorie: "",
     compte: "",
     numeroCheque: "",
+    numeroFacture: "",
+    adminPasswordOverride: "",
   });
 
   // --- Security & Delete States
@@ -184,6 +191,14 @@ export default function TransactionsPage() {
 
   const formatDate = (dateString: string) => {
     return dateString.split('T')[0];
+  };
+  const defaultCaisseName = useMemo(() => {
+    const caisse = accountsData.find((c: any) => c.type === 'CAISSE');
+    return caisse?.nom || "";
+  }, [accountsData]);
+  const getSelectedAccountType = (name: string) => {
+    const acc = accountsData.find((a) => a.nom === name);
+    return acc?.type || "";
   };
 
   // --- Fetch Data
@@ -301,10 +316,20 @@ export default function TransactionsPage() {
       ...formData,
       type: newType,
       categorie: "", // Reset categorie on type change
-      compte: "", // Reset compte on type change
+      compte: newType === "Revenu" ? defaultCaisseName : defaultCaisseName, // dépense pourra changer ensuite
       numeroCheque: "",
+      numeroFacture: "",
+      adminPasswordOverride: "",
     });
   };
+
+  useEffect(() => {
+    // Dès que les comptes sont chargés, assigner la caisse par défaut si rien n'est sélectionné
+    setFormData(prev => ({
+      ...prev,
+      compte: prev.compte || defaultCaisseName,
+    }));
+  }, [defaultCaisseName]);
 
   const getSortedTransactions = () => {
     let sorted = [...transactions];
@@ -405,10 +430,21 @@ export default function TransactionsPage() {
   const montantNumber = parseFloat(formData.montant) || 0;
   const isCaisseDisabled =
     formData.type === "Dépense" && montantNumber > soldeCaisse;
+  const selectedAccountType = getSelectedAccountType(formData.compte);
+  const isBanqueSelected = selectedAccountType === 'BANQUE';
+  const isCaisseSelected = selectedAccountType === 'CAISSE';
   const showNumeroCheque =
-    formData.type === "Dépense" && formData.compte.toLowerCase().includes("banque");
+    formData.type === "Dépense" && isBanqueSelected;
+  const requiresFacture = formData.type === "Dépense" && montantNumber > 20000;
+  const hasFacture = !!formData.numeroFacture?.trim();
+  const needsAdminPassword = requiresFacture && !hasFacture;
 
   // --- Security & Modify Logic
+
+  const startView = (transaction: Transaction) => {
+    setSelectedTransactionToView(transaction);
+    setIsViewModalOpen(true);
+  };
 
   const startModify = (transaction: Transaction) => {
     setSelectedTransactionToModify(transaction);
@@ -438,6 +474,8 @@ export default function TransactionsPage() {
           categorie: selectedTransactionToModify.categorie,
           compte: selectedTransactionToModify.compte,
           numeroCheque: "",
+          numeroFacture: "",
+          adminPasswordOverride: "",
         });
         setIsModifyModalOpen(true);
       }
@@ -458,6 +496,21 @@ export default function TransactionsPage() {
       return;
     }
 
+    if (requiresFacture && !hasFacture && formData.adminPasswordOverride !== SECRET_PASSWORD) {
+      showToast("Facture requise au-delà de 20 000 Ar ou mot de passe admin nécessaire.", "warning");
+      return;
+    }
+
+    if (formData.type === "Dépense" && isCaisseSelected && montantNumber > soldeCaisse) {
+      showToast("Montant supérieur au solde disponible en caisse.", "warning");
+      return;
+    }
+
+    if (formData.type === "Dépense" && isBanqueSelected && montantNumber > soldeBanque) {
+      showToast("Montant supérieur au solde disponible en banque.", "warning");
+      return;
+    }
+
     try {
       // Trouver les IDs correspondants aux noms
       const cat = categoriesData.find(c => c.nom === formData.categorie);
@@ -468,11 +521,15 @@ export default function TransactionsPage() {
         return;
       }
 
+      const descriptionWithFacture = hasFacture
+        ? `${formData.description} (Facture: ${formData.numeroFacture})`
+        : formData.description;
+
       await api.put(`/transactions/${formData.id}`, {
         categorieId: parseInt(cat.id),
         compteId: acc.id,
         dateTransaction: formData.date,
-        description: formData.description,
+        description: descriptionWithFacture,
         montant: parseFloat(formData.montant),
         type: formData.type === 'Revenu' ? 'RECETTE' : 'DEPENSE'
       });
@@ -491,6 +548,8 @@ export default function TransactionsPage() {
         categorie: "",
         compte: "",
         numeroCheque: "",
+        numeroFacture: "",
+        adminPasswordOverride: "",
       });
 
     } catch (error) {
@@ -539,6 +598,21 @@ export default function TransactionsPage() {
       return;
     }
 
+    if (requiresFacture && !hasFacture && formData.adminPasswordOverride !== SECRET_PASSWORD) {
+      showToast("Facture requise au-delà de 20 000 Ar ou mot de passe admin nécessaire.", "warning");
+      return;
+    }
+
+    if (formData.type === "Dépense" && isCaisseSelected && montantNumber > soldeCaisse) {
+      showToast("Montant supérieur au solde disponible en caisse.", "warning");
+      return;
+    }
+
+    if (formData.type === "Dépense" && isBanqueSelected && montantNumber > soldeBanque) {
+      showToast("Montant supérieur au solde disponible en banque.", "warning");
+      return;
+    }
+
     try {
       // Trouver les IDs correspondants aux noms
       const cat = categoriesData.find(c => c.nom === formData.categorie);
@@ -549,11 +623,15 @@ export default function TransactionsPage() {
         return;
       }
 
+      const descriptionWithFacture = hasFacture
+        ? `${formData.description} (Facture: ${formData.numeroFacture})`
+        : formData.description;
+
       await api.post('/transactions', {
         categorieId: parseInt(cat.id),
         compteId: acc.id,
         dateTransaction: formData.date,
-        description: formData.description,
+        description: descriptionWithFacture,
         montant: parseFloat(formData.montant),
         type: formData.type === 'Revenu' ? 'RECETTE' : 'DEPENSE'
       });
@@ -569,8 +647,10 @@ export default function TransactionsPage() {
         montant: "",
         type: "Revenu",
         categorie: "",
-        compte: "",
+        compte: defaultCaisseName,
         numeroCheque: "",
+        numeroFacture: "",
+        adminPasswordOverride: "",
       });
 
     } catch (error) {
@@ -818,6 +898,13 @@ export default function TransactionsPage() {
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-center gap-2 opacity-60 transition group-hover:opacity-100">
                         <button
+                          onClick={() => startView(t)}
+                          className="rounded-full p-2 text-black/40 transition hover:bg-zinc-50 hover:text-black"
+                          title="Voir"
+                        >
+                          <EyeIcon />
+                        </button>
+                        <button
                           onClick={() => startModify(t)}
                           className="rounded-full p-2 text-black/40 transition hover:bg-blue-50 hover:text-blue-600"
                           title="Modifier"
@@ -910,6 +997,10 @@ export default function TransactionsPage() {
           soldeCaisse={soldeCaisse}
           soldeBanque={soldeBanque}
           accounts={accountsData}
+          lockedCompteName={defaultCaisseName}
+          lockCompte={formData.type === "Revenu"}
+          showFacturePrompt={requiresFacture}
+          needsAdminPassword={needsAdminPassword}
         />
       )}
 
@@ -965,7 +1056,60 @@ export default function TransactionsPage() {
           soldeCaisse={soldeCaisse}
           soldeBanque={soldeBanque}
           accounts={accountsData}
+          lockedCompteName={defaultCaisseName}
+          lockCompte={formData.type === "Revenu"}
+          showFacturePrompt={requiresFacture}
+          needsAdminPassword={needsAdminPassword}
         />
+      )}
+
+      {isViewModalOpen && selectedTransactionToView && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-3xl border border-black/10 bg-white p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <p
+                  className={`text-xs font-semibold uppercase tracking-[0.3em] ${selectedTransactionToView.type === "Revenu" ? "text-emerald-500" : "text-red-500"
+                    }`}
+                >
+                  {selectedTransactionToView.type === "Revenu" ? "Recette" : "Dépense"}
+                </p>
+                <h3 className="text-lg font-bold text-black">Détails de la transaction</h3>
+              </div>
+              <button
+                onClick={() => setIsViewModalOpen(false)}
+                className="rounded-full p-2 text-black/50 transition hover:bg-zinc-100 hover:text-black"
+              >
+                <CloseIcon />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-sm text-black/80">
+              <div className="flex justify-between">
+                <span className="text-black/60">Date</span>
+                <span className="font-semibold">{selectedTransactionToView.date}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-black/60">Description</span>
+                <span className="font-semibold text-right">{selectedTransactionToView.description}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-black/60">Catégorie</span>
+                <span className="font-semibold">{selectedTransactionToView.categorie}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-black/60">Compte</span>
+                <span className="font-semibold">{selectedTransactionToView.compte}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-black/60">Montant</span>
+                <span className={`font-bold ${selectedTransactionToView.type === "Revenu" ? "text-emerald-600" : "text-red-600"}`}>
+                  {selectedTransactionToView.montantAffiche}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       <ConfirmModal
