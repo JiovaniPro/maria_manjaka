@@ -40,6 +40,7 @@ type Transaction = {
   type: "Revenu" | "Dépense";
   categorie: string;
   compte: string;
+  numeroCheque?: string;
   categorieId?: number; // Pour l'API
   compteId?: number; // Pour l'API
 };
@@ -55,6 +56,7 @@ type Account = {
   id: number;
   nom: string;
   solde: number;
+  type?: string;
 };
 
 type SortField = "date" | "montant" | "description";
@@ -200,6 +202,7 @@ export default function TransactionsPage() {
     const acc = accountsData.find((a) => a.nom === name);
     return acc?.type || "";
   };
+  const [chequeStatus, setChequeStatus] = useState<"idle" | "checking" | "exists" | "free">("idle");
 
   // --- Fetch Data
   const fetchData = async () => {
@@ -219,18 +222,23 @@ export default function TransactionsPage() {
       const comptesApi = comptesRes.data.data;
 
       // Map Transactions
-      const mappedTransactions: Transaction[] = transactionsApi.map((t: any) => ({
-        id: t.id.toString(),
-        date: formatDate(t.dateTransaction),
-        description: t.description || t.type,
-        montant: parseFloat(t.montant), // CRITICAL: Parse as number to prevent string concatenation
-        montantAffiche: t.type === 'RECETTE' ? `+${formatCurrency(t.montant)}` : `-${formatCurrency(t.montant)}`,
-        type: t.type === 'RECETTE' ? 'Revenu' : 'Dépense',
-        categorie: t.categorie?.nom || 'Inconnue',
-        compte: t.compte?.nom || 'Inconnu',
-        categorieId: t.categorieId,
-        compteId: t.compteId
-      }));
+      const mappedTransactions: Transaction[] = transactionsApi.map((t: any) => {
+        const description = t.description || t.type;
+        const chequeMatch = description?.match(/CHQ-([\w-]+)/);
+        return {
+          id: t.id.toString(),
+          date: formatDate(t.dateTransaction),
+          description,
+          montant: parseFloat(t.montant), // CRITICAL: Parse as number to prevent string concatenation
+          montantAffiche: t.type === 'RECETTE' ? `+${formatCurrency(t.montant)}` : `-${formatCurrency(t.montant)}`,
+          type: t.type === 'RECETTE' ? 'Revenu' : 'Dépense',
+          categorie: t.categorie?.nom || 'Inconnue',
+          compte: t.compte?.nom || 'Inconnu',
+          numeroCheque: t.numeroCheque || (chequeMatch ? chequeMatch[1] : undefined),
+          categorieId: t.categorieId,
+          compteId: t.compteId
+        };
+      });
 
       // Map Categories
       const mappedCategories: Category[] = categoriesApi.map((c: any) => ({
@@ -438,6 +446,33 @@ export default function TransactionsPage() {
   const requiresFacture = formData.type === "Dépense" && montantNumber > 20000;
   const hasFacture = !!formData.numeroFacture?.trim();
   const needsAdminPassword = requiresFacture && !hasFacture;
+  const isChequeChecking = chequeStatus === "checking";
+  const isChequeExists = chequeStatus === "exists";
+  const submitDisabledByCheque = formData.type === "Dépense" && isBanqueSelected && (isChequeChecking || isChequeExists);
+
+  // Vérification du numéro de chèque côté banque (après calcul des flags)
+  useEffect(() => {
+    const shouldCheck = formData.type === "Dépense" && isBanqueSelected && formData.numeroCheque.trim().length > 0;
+    if (!shouldCheck) {
+      setChequeStatus("idle");
+      return;
+    }
+    let cancelled = false;
+    const checkCheque = async () => {
+      setChequeStatus("checking");
+      try {
+        const resp = await api.get(`/transactions-bancaires?numeroCheque=${encodeURIComponent(formData.numeroCheque.trim())}`);
+        if (cancelled) return;
+        const exists = Array.isArray(resp.data.data) && resp.data.data.length > 0;
+        setChequeStatus(exists ? "exists" : "free");
+      } catch (err) {
+        if (cancelled) return;
+        setChequeStatus("free"); // en cas d'erreur, on ne bloque pas mais on laisse l'API finale valider
+      }
+    };
+    const timer = setTimeout(checkCheque, 400);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [formData.type, formData.numeroCheque, isBanqueSelected]);
 
   // --- Security & Modify Logic
 
@@ -473,7 +508,7 @@ export default function TransactionsPage() {
           type: selectedTransactionToModify.type,
           categorie: selectedTransactionToModify.categorie,
           compte: selectedTransactionToModify.compte,
-          numeroCheque: "",
+          numeroCheque: selectedTransactionToModify.numeroCheque || "",
           numeroFacture: "",
           adminPasswordOverride: "",
         });
@@ -524,12 +559,16 @@ export default function TransactionsPage() {
       const descriptionWithFacture = hasFacture
         ? `${formData.description} (Facture: ${formData.numeroFacture})`
         : formData.description;
+      const descriptionWithCheque =
+        formData.type === "Dépense" && formData.numeroCheque
+          ? `${descriptionWithFacture} (CHQ-${formData.numeroCheque})`
+          : descriptionWithFacture;
 
       await api.put(`/transactions/${formData.id}`, {
         categorieId: parseInt(cat.id),
         compteId: acc.id,
         dateTransaction: formData.date,
-        description: descriptionWithFacture,
+        description: descriptionWithCheque,
         montant: parseFloat(formData.montant),
         type: formData.type === 'Revenu' ? 'RECETTE' : 'DEPENSE'
       });
@@ -613,6 +652,17 @@ export default function TransactionsPage() {
       return;
     }
 
+    if (formData.type === "Dépense" && isBanqueSelected) {
+      if (isChequeChecking) {
+        showToast("Vérification du chèque en cours...", "warning");
+        return;
+      }
+      if (isChequeExists) {
+        showToast("Ce numéro de chèque existe déjà en transaction bancaire.", "error");
+        return;
+      }
+    }
+
     try {
       // Trouver les IDs correspondants aux noms
       const cat = categoriesData.find(c => c.nom === formData.categorie);
@@ -626,12 +676,28 @@ export default function TransactionsPage() {
       const descriptionWithFacture = hasFacture
         ? `${formData.description} (Facture: ${formData.numeroFacture})`
         : formData.description;
+      const descriptionWithCheque =
+        formData.type === "Dépense" && formData.numeroCheque
+          ? `${descriptionWithFacture} (CHQ-${formData.numeroCheque})`
+          : descriptionWithFacture;
+
+      // Si dépense bancaire : créer d'abord la transaction bancaire pour garantir la validation du chèque
+      if (formData.type === "Dépense" && isBanqueSelected) {
+        await api.post('/transactions-bancaires', {
+          compteId: acc.id,
+          dateOperation: formData.date,
+          description: formData.description,
+          montant: parseFloat(formData.montant),
+          type: 'RETRAIT',
+          numeroCheque: formData.numeroCheque
+        });
+      }
 
       await api.post('/transactions', {
         categorieId: parseInt(cat.id),
         compteId: acc.id,
         dateTransaction: formData.date,
-        description: descriptionWithFacture,
+        description: descriptionWithCheque,
         montant: parseFloat(formData.montant),
         type: formData.type === 'Revenu' ? 'RECETTE' : 'DEPENSE'
       });
@@ -1001,6 +1067,9 @@ export default function TransactionsPage() {
           lockCompte={formData.type === "Revenu"}
           showFacturePrompt={requiresFacture}
           needsAdminPassword={needsAdminPassword}
+          chequeExists={isChequeExists}
+          chequeChecking={isChequeChecking}
+          submitDisabled={submitDisabledByCheque}
         />
       )}
 
@@ -1107,6 +1176,12 @@ export default function TransactionsPage() {
                   {selectedTransactionToView.montantAffiche}
                 </span>
               </div>
+              {selectedTransactionToView.numeroCheque && (
+                <div className="flex justify-between">
+                  <span className="text-black/60">Chèque</span>
+                  <span className="font-semibold">CHQ-{selectedTransactionToView.numeroCheque}</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

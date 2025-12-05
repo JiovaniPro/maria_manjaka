@@ -36,6 +36,9 @@ type TransactionFormProps = {
     lockedCompteName?: string;
     showFacturePrompt?: boolean;
     needsAdminPassword?: boolean;
+    chequeExists?: boolean;
+    chequeChecking?: boolean;
+    submitDisabled?: boolean;
 };
 
 export function TransactionForm({
@@ -56,6 +59,9 @@ export function TransactionForm({
     lockedCompteName,
     showFacturePrompt = false,
     needsAdminPassword = false,
+    chequeExists = false,
+    chequeChecking = false,
+    submitDisabled = false,
 }: TransactionFormProps) {
     const selectValue = lockCompte && lockedCompteName ? lockedCompteName : formData.compte;
 
@@ -235,6 +241,12 @@ export function TransactionForm({
                                 className="w-full rounded-xl border border-red-500 bg-red-50 p-3 text-sm placeholder:text-red-300 focus:border-red-500 focus:ring-red-500"
                                 placeholder="Obligatoire pour un paiement par Banque A"
                             />
+                            {chequeChecking && (
+                                <p className="mt-1 text-xs text-amber-600">Vérification du numéro de chèque...</p>
+                            )}
+                            {chequeExists && !chequeChecking && (
+                                <p className="mt-1 text-xs text-red-600">Ce numéro de chèque existe déjà.</p>
+                            )}
                         </div>
                     )}
 
@@ -286,7 +298,8 @@ export function TransactionForm({
                         </button>
                         <button
                             type="submit"
-                            className="rounded-2xl bg-blue-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-600"
+                            disabled={submitDisabled}
+                            className="rounded-2xl bg-blue-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                             {isModification
                                 ? "Enregistrer les modifications"
