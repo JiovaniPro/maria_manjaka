@@ -420,12 +420,14 @@ export default function DashboardPage() {
         });
 
         // Calculer les soldes totaux par type
-        const soldeCaisse = comptesCaisse.reduce((acc: number, c: any) => 
-          acc + parseFloat(c.soldeActuel || 0), 0
+        const soldeCaisse = comptesCaisse.reduce(
+          (acc: number, c: any) => acc + parseFloat(c.soldeActuel || 0),
+          0
         );
-        const soldeBanque = comptesBanque.reduce((acc: number, c: any) => 
-          acc + parseFloat(c.soldeActuel || 0), 0
-        );
+        // Aligner avec la page banque : prendre le compte bancaire principal et afficher en absolu (comme carte sécurisée)
+        const mainBanque = comptesBanque[0];
+        const soldeBanqueRaw = mainBanque ? parseFloat(mainBanque.soldeActuel || 0) : 0;
+        const soldeBanque = Math.abs(soldeBanqueRaw);
 
         // Calculer la répartition des revenus par catégorie
         const categoryMap = new Map<string, number>();
@@ -488,7 +490,7 @@ export default function DashboardPage() {
         // Préparer la liste des comptes
         setAccounts(comptesData.map((c: any) => ({
           name: c.nom,
-          solde: formatCurrency(c.soldeActuel || 0),
+          solde: formatCurrency(Math.abs(c.soldeActuel || 0)),
         })));
 
       } catch (error) {

@@ -221,33 +221,6 @@ export default function TransactionsPage() {
       const comptesRes = await api.get('/comptes');
       const comptesApi = comptesRes.data.data;
 
-      // Map Transactions
-      const mappedTransactions: Transaction[] = transactionsApi.map((t: any) => {
-        const description = t.description || t.type;
-        const chequeMatch = description?.match(/CHQ-([\w-]+)/);
-        return {
-          id: t.id.toString(),
-          date: formatDate(t.dateTransaction),
-          description,
-          montant: parseFloat(t.montant), // CRITICAL: Parse as number to prevent string concatenation
-          montantAffiche: t.type === 'RECETTE' ? `+${formatCurrency(t.montant)}` : `-${formatCurrency(t.montant)}`,
-          type: t.type === 'RECETTE' ? 'Revenu' : 'Dépense',
-          categorie: t.categorie?.nom || 'Inconnue',
-          compte: t.compte?.nom || 'Inconnu',
-          numeroCheque: t.numeroCheque || (chequeMatch ? chequeMatch[1] : undefined),
-          categorieId: t.categorieId,
-          compteId: t.compteId
-        };
-      });
-
-      // Map Categories
-      const mappedCategories: Category[] = categoriesApi.map((c: any) => ({
-        id: c.id.toString(),
-        nom: c.nom,
-        type: c.type === 'RECETTE' ? 'Revenu' : 'Dépense',
-        statut: c.statut ? c.statut.toLowerCase() : 'actif'
-      }));
-
       // Map Accounts
       setAccountsData(comptesApi);
       
@@ -262,6 +235,35 @@ export default function TransactionsPage() {
       const soldeBanqueTotal = comptesApi
         .filter((c: any) => c.type === 'BANQUE')
         .reduce((acc: number, c: any) => acc + parseFloat(c.soldeActuel || 0), 0);
+
+      // Map Transactions (après avoir identifié la banque)
+      const mappedTransactions: Transaction[] = transactionsApi.map((t: any) => {
+        const description = t.description || t.type;
+        const chequeMatch = description?.match(/CHQ-([\w-]+)/);
+        // Si la dépense a un chèque, elle a été payée via banque : afficher la banque même si la contrepartie comptable est en caisse
+        const isBankPaidExpense = t.type === 'DEPENSE' && (t.numeroCheque || chequeMatch) && banque?.nom;
+        return {
+          id: t.id.toString(),
+          date: formatDate(t.dateTransaction),
+          description,
+          montant: parseFloat(t.montant), // CRITICAL: Parse as number to prevent string concatenation
+          montantAffiche: t.type === 'RECETTE' ? `+${formatCurrency(t.montant)}` : `-${formatCurrency(t.montant)}`,
+          type: t.type === 'RECETTE' ? 'Revenu' : 'Dépense',
+          categorie: t.categorie?.nom || 'Inconnue',
+          compte: isBankPaidExpense ? banque!.nom : (t.compte?.nom || 'Inconnu'),
+          numeroCheque: t.numeroCheque || (chequeMatch ? chequeMatch[1] : undefined),
+          categorieId: t.categorieId,
+          compteId: t.compteId
+        };
+      });
+
+      // Map Categories
+      const mappedCategories: Category[] = categoriesApi.map((c: any) => ({
+        id: c.id.toString(),
+        nom: c.nom,
+        type: c.type === 'RECETTE' ? 'Revenu' : 'Dépense',
+        statut: c.statut ? c.statut.toLowerCase() : 'actif'
+      }));
 
       setSoldeCaisse(soldeCaisseTotal);
       setSoldeBanque(soldeBanqueTotal);
@@ -550,9 +552,15 @@ export default function TransactionsPage() {
       // Trouver les IDs correspondants aux noms
       const cat = categoriesData.find(c => c.nom === formData.categorie);
       const acc = accountsData.find(a => a.nom === formData.compte);
+      const caisseAcc = accountsData.find(a => a.type === 'CAISSE');
 
       if (!cat || !acc) {
         showToast("Catégorie ou compte invalide", "error");
+        return;
+      }
+
+      if (formData.type === "Dépense" && isBanqueSelected && !caisseAcc) {
+        showToast("Aucun compte caisse trouvé pour enregistrer la dépense.", "error");
         return;
       }
 
@@ -667,9 +675,15 @@ export default function TransactionsPage() {
       // Trouver les IDs correspondants aux noms
       const cat = categoriesData.find(c => c.nom === formData.categorie);
       const acc = accountsData.find(a => a.nom === formData.compte);
+      const caisseAcc = accountsData.find(a => a.type === 'CAISSE');
 
       if (!cat || !acc) {
         showToast("Catégorie ou compte invalide", "error");
+        return;
+      }
+
+      if (formData.type === "Dépense" && isBanqueSelected && !caisseAcc) {
+        showToast("Aucun compte caisse trouvé pour enregistrer la dépense.", "error");
         return;
       }
 
@@ -693,9 +707,15 @@ export default function TransactionsPage() {
         });
       }
 
+      // Pour une dépense réglée par la banque, on crée d'abord la transaction bancaire (débit banque / crédit caisse)
+      // puis on enregistre la dépense côté opérations courantes sur la caisse pour éviter un double débit bancaire.
+      const targetCompteId = (formData.type === 'Dépense' && isBanqueSelected && caisseAcc)
+        ? caisseAcc.id
+        : acc.id;
+
       await api.post('/transactions', {
         categorieId: parseInt(cat.id),
-        compteId: acc.id,
+        compteId: targetCompteId,
         dateTransaction: formData.date,
         description: descriptionWithCheque,
         montant: parseFloat(formData.montant),
