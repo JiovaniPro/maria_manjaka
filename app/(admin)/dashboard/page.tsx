@@ -43,7 +43,7 @@ type TrendData = {
 // COMPONENTS
 // ====================================================================
 
-const SECRET_PASSWORD = "1234"; // Simulation
+import { useAdminPassword } from "@/hooks/useAdminPassword";
 
 function SecureAccountCard({
   account,
@@ -52,6 +52,7 @@ function SecureAccountCard({
   account: Account;
   showToast: (msg: string, type: "success" | "error" | "warning") => void;
 }) {
+  const { adminPassword } = useAdminPassword();
   const [showSolde, setShowSolde] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [password, setPassword] = useState("");
@@ -86,7 +87,7 @@ function SecureAccountCard({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === SECRET_PASSWORD) {
+    if (password === adminPassword) {
       setShowSolde(true);
       setIsAuthModalOpen(false);
       setPassword("");
@@ -165,6 +166,7 @@ function SecureFinancialCard({
   card: FinancialCard;
   showToast: (msg: string, type: "success" | "error" | "warning") => void;
 }) {
+  const { adminPassword } = useAdminPassword();
   const [showSolde, setShowSolde] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [password, setPassword] = useState("");
@@ -199,7 +201,7 @@ function SecureFinancialCard({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === SECRET_PASSWORD) {
+    if (password === adminPassword) {
       setShowSolde(true);
       setIsAuthModalOpen(false);
       setPassword("");

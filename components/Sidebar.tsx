@@ -15,7 +15,7 @@ import {
 } from "@/components/Icons";
 
 type NavItem = { label: string; icon: any; href: string };
-type PreferenceItem = { label: string; icon: any };
+type PreferenceItem = { label: string; icon: any; href?: string };
 
 const navItems: NavItem[] = [
     { label: "Dashboard", icon: DashboardIcon, href: "/dashboard" },
@@ -25,7 +25,7 @@ const navItems: NavItem[] = [
 ];
 
 const preferenceItems: PreferenceItem[] = [
-    { label: "Paramètres", icon: SettingsIcon },
+    { label: "Paramètres", icon: SettingsIcon, href: "/parametre" },
 ];
 
 export function Sidebar() {
@@ -81,14 +81,33 @@ export function Sidebar() {
                     Préférences
                 </p>
                 <ul className="space-y-2">
-                    {preferenceItems.map(({ label, icon: Icon }) => (
-                        <li key={label}>
-                            <button className="flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-sm text-white/70 transition hover:bg-white/10">
-                                <Icon />
-                                <span>{label}</span>
-                            </button>
-                        </li>
-                    ))}
+                    {preferenceItems.map(({ label, icon: Icon, href }) => {
+                        const isActive = href ? pathname === href : false;
+                        if (href) {
+                            return (
+                                <li key={label}>
+                                    <Link
+                                        href={href}
+                                        className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-sm transition ${isActive
+                                                ? "bg-white text-black"
+                                                : "text-white/70 hover:bg-white/10"
+                                            }`}
+                                    >
+                                        <Icon />
+                                        <span>{label}</span>
+                                    </Link>
+                                </li>
+                            );
+                        }
+                        return (
+                            <li key={label}>
+                                <button className="flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-sm text-white/70 transition hover:bg-white/10">
+                                    <Icon />
+                                    <span>{label}</span>
+                                </button>
+                            </li>
+                        );
+                    })}
                 </ul>
                 <button
                     onClick={handleLogout}

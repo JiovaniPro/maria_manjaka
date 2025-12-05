@@ -46,8 +46,7 @@ type BankAccount = {
 // API DATA SIMULATION (REMOVED)
 // ====================================================================
 
-// 1. Clés Secrètes
-const SECRET_PASSWORD = "1234"; // Simulation mot de passe administrateur
+import { useAdminPassword } from "@/hooks/useAdminPassword";
 
 const months = [
   { value: "", label: "Tous les mois" },
@@ -74,6 +73,7 @@ function EyeOffIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5" fill
 // ====================================================================
 
 function SecureSoldeCard({ soldeActuel, showToast }: { soldeActuel: number, showToast: (message: string, type: 'success' | 'error' | 'warning' | 'info') => void }) {
+  const { adminPassword } = useAdminPassword();
   const [showSolde, setShowSolde] = useState(false);
   const [soldeAuthModalOpen, setSoldeAuthModalOpen] = useState(false);
   const [soldeAuthPassword, setSoldeAuthPassword] = useState("");
@@ -112,7 +112,7 @@ function SecureSoldeCard({ soldeActuel, showToast }: { soldeActuel: number, show
 
   const handleSoldeAuth = (e: React.FormEvent) => {
     e.preventDefault();
-    if (soldeAuthPassword === SECRET_PASSWORD) {
+    if (soldeAuthPassword === adminPassword) {
       setShowSolde(true);
       setSoldeAuthModalOpen(false);
       setSoldeAuthPassword("");
@@ -316,6 +316,7 @@ export default function BanquePage() {
   const pathname = usePathname();
   const router = useRouter();
   const { showToast } = useToast(); // UTILISATION DU HOOK useToast
+  const { adminPassword } = useAdminPassword();
 
   const isLoading = useLoading(1000);
 
@@ -438,7 +439,7 @@ export default function BanquePage() {
 
   const verifyPassword = (e: React.FormEvent) => {
     e.preventDefault();
-    if (authPassword === SECRET_PASSWORD) {
+    if (authPassword === adminPassword) {
       setIsAuthModalOpen(false);
       setFormData({
         ...selectedItem,

@@ -62,8 +62,7 @@ type Account = {
 type SortField = "date" | "montant" | "description";
 type SortOrder = "asc" | "desc" | null;
 
-// --- CONSTANTES
-const SECRET_PASSWORD = "1234"; // Simulation
+import { useAdminPassword } from "@/hooks/useAdminPassword";
 
 const months = [
   { value: "", label: "Tous les mois" },
@@ -133,6 +132,7 @@ export default function TransactionsPage() {
   const router = useRouter();
   const { showToast } = useToast();
   const isLoading = useLoading(1200);
+  const { adminPassword } = useAdminPassword();
 
   // --- VARIABLES D'ÉTAT POUR L'API
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -491,7 +491,7 @@ export default function TransactionsPage() {
 
   const handleAuthSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (authPassword === SECRET_PASSWORD) {
+    if (authPassword === adminPassword) {
       showToast(
         "Mot de passe correct. Ouverture du modal de modification.",
         "success"
@@ -533,7 +533,7 @@ export default function TransactionsPage() {
       return;
     }
 
-    if (requiresFacture && !hasFacture && formData.adminPasswordOverride !== SECRET_PASSWORD) {
+    if (requiresFacture && !hasFacture && formData.adminPasswordOverride !== adminPassword) {
       showToast("Facture requise au-delà de 20 000 Ar ou mot de passe admin nécessaire.", "warning");
       return;
     }
@@ -645,7 +645,7 @@ export default function TransactionsPage() {
       return;
     }
 
-    if (requiresFacture && !hasFacture && formData.adminPasswordOverride !== SECRET_PASSWORD) {
+    if (requiresFacture && !hasFacture && formData.adminPasswordOverride !== adminPassword) {
       showToast("Facture requise au-delà de 20 000 Ar ou mot de passe admin nécessaire.", "warning");
       return;
     }
