@@ -11,6 +11,13 @@ type Category = {
     statut: "actif" | "inactif";
 };
 
+type SousCategorie = {
+    id: number;
+    nom: string;
+    categorieId: number;
+    statut: "ACTIF" | "INACTIF";
+};
+
 type Account = {
     id: number;
     nom: string;
@@ -28,6 +35,7 @@ type TransactionFormProps = {
     ) => void;
     handleTypeChange: (newType: "Revenu" | "Dépense") => void;
     availableCategories: Category[];
+    sousCategories?: SousCategorie[];
     accounts: Account[];
     isCaisseDisabled: boolean;
     showNumeroCheque: boolean;
@@ -51,6 +59,7 @@ export function TransactionForm({
     handleInputChange,
     handleTypeChange,
     availableCategories,
+    sousCategories = [],
     accounts,
     isCaisseDisabled,
     showNumeroCheque,
@@ -160,14 +169,13 @@ export function TransactionForm({
                     {/* Description */}
                     <div>
                         <label className="mb-2 block text-sm font-semibold text-black">
-                            Description
+                            Description <span className="text-black/40 text-xs">(optionnel)</span>
                         </label>
                         <input
                             type="text"
                             name="description"
                             value={formData.description}
                             onChange={handleInputChange}
-                            required
                             className="w-full rounded-xl border border-black/10 bg-zinc-50 p-3 text-sm focus:border-blue-500 focus:ring-blue-500"
                             placeholder="Ex: Achat de fournitures, Offrande du mois..."
                         />
@@ -195,6 +203,39 @@ export function TransactionForm({
                                     </option>
                                 ))}
                             </select>
+                        </div>
+
+                        {/* Sous-catégorie */}
+                        <div>
+                            <label className="mb-2 block text-sm font-semibold text-black">
+                                Sous-catégorie <span className="text-red-500">*</span>
+                            </label>
+                            <select
+                                name="sousCategorie"
+                                value={formData.sousCategorie || ""}
+                                onChange={handleInputChange}
+                                required
+                                disabled={!formData.categorie || sousCategories.length === 0}
+                                className="w-full rounded-xl border border-black/10 bg-zinc-50 p-3 text-sm focus:border-blue-500 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-zinc-100"
+                            >
+                                <option value="" disabled>
+                                    {!formData.categorie 
+                                        ? "Sélectionner d'abord une catégorie"
+                                        : sousCategories.length === 0
+                                        ? "Aucune sous-catégorie disponible - Créez-en une dans la page Catégories"
+                                        : "Sélectionner une sous-catégorie"}
+                                </option>
+                                {sousCategories.map((sc) => (
+                                    <option key={sc.id} value={sc.id.toString()}>
+                                        {sc.nom}
+                                    </option>
+                                ))}
+                            </select>
+                            {formData.categorie && sousCategories.length === 0 && (
+                                <p className="mt-2 text-xs text-red-500">
+                                    Aucune sous-catégorie disponible. Veuillez créer une sous-catégorie pour cette catégorie dans la page Catégories.
+                                </p>
+                            )}
                         </div>
 
                         {/* Compte */}

@@ -43,6 +43,7 @@ type Transaction = {
   compte: string;
   numeroCheque?: string;
   categorieId?: number; // Pour l'API
+  sousCategorieId?: number; // Pour l'API
   compteId?: number; // Pour l'API
 };
 
@@ -51,6 +52,13 @@ type Category = {
   nom: string;
   type: "Revenu" | "Dépense";
   statut: "actif" | "inactif";
+};
+
+type SousCategorie = {
+  id: number;
+  nom: string;
+  categorieId: number;
+  statut: "ACTIF" | "INACTIF";
 };
 
 type Account = {
@@ -138,6 +146,7 @@ export default function TransactionsPage() {
   // --- VARIABLES D'ÉTAT POUR L'API
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categoriesData, setCategoriesData] = useState<Category[]>([]);
+  const [sousCategoriesData, setSousCategoriesData] = useState<SousCategorie[]>([]);
   const [accountsData, setAccountsData] = useState<Account[]>([]);
   const [soldeCaisse, setSoldeCaisse] = useState(0);
   const [soldeBanque, setSoldeBanque] = useState(0);
@@ -148,6 +157,7 @@ export default function TransactionsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCompte, setFilterCompte] = useState("");
   const [filterCategorie, setFilterCategorie] = useState("");
+  const [filterSousCategorie, setFilterSousCategorie] = useState("");
   const [filterMonth, setFilterMonth] = useState("");
   const [filterYear, setFilterYear] = useState("");
   const [filterType, setFilterType] = useState<"" | "Revenu" | "Dépense">("");
@@ -170,6 +180,7 @@ export default function TransactionsPage() {
     montant: "",
     type: "Revenu" as "Revenu" | "Dépense",
     categorie: "",
+    sousCategorie: "",
     compte: "",
     numeroCheque: "",
     numeroFacture: "",
@@ -254,6 +265,7 @@ export default function TransactionsPage() {
           compte: isBankPaidExpense ? banque!.nom : (t.compte?.nom || 'Inconnu'),
           numeroCheque: t.numeroCheque || (chequeMatch ? chequeMatch[1] : undefined),
           categorieId: t.categorieId,
+          sousCategorieId: t.sousCategorie?.id || t.sousCategorieId,
           compteId: t.compteId
         };
       });
@@ -283,6 +295,52 @@ export default function TransactionsPage() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Charger les sous-catégories quand une catégorie est sélectionnée dans le formulaire
+  useEffect(() => {
+    const loadSousCategories = async () => {
+      if (formData.categorie) {
+        try {
+          // Trouver l'ID de la catégorie à partir de son nom
+          const selectedCat = categoriesData.find((c) => c.nom === formData.categorie);
+          if (selectedCat) {
+            const response = await api.get(`/sous-categories?categorieId=${selectedCat.id}&statut=ACTIF`);
+            setSousCategoriesData(response.data.data || []);
+          } else {
+            setSousCategoriesData([]);
+          }
+        } catch (error) {
+          console.error("Erreur chargement sous-catégories:", error);
+          setSousCategoriesData([]);
+        }
+      } else {
+        setSousCategoriesData([]);
+        setFormData(prev => ({ ...prev, sousCategorie: "" }));
+      }
+    };
+    loadSousCategories();
+  }, [formData.categorie, categoriesData]);
+
+  // Charger les sous-catégories pour le filtre quand une catégorie est sélectionnée
+  useEffect(() => {
+    const loadSousCategoriesForFilter = async () => {
+      if (filterCategorie) {
+        try {
+          const selectedCat = categoriesData.find((c) => c.nom === filterCategorie);
+          if (selectedCat) {
+            const response = await api.get(`/sous-categories?categorieId=${selectedCat.id}&statut=ACTIF`);
+            setSousCategoriesData(response.data.data || []);
+          }
+        } catch (error) {
+          console.error("Erreur chargement sous-catégories pour filtre:", error);
+          setSousCategoriesData([]);
+        }
+      } else {
+        setFilterSousCategorie("");
+      }
+    };
+    loadSousCategoriesForFilter();
+  }, [filterCategorie, categoriesData]);
 
   // --- Handlers & Logic
 
@@ -404,6 +462,8 @@ export default function TransactionsPage() {
       const matchCompte = filterCompte === "" || t.compte === filterCompte;
       const matchCategorie =
         filterCategorie === "" || t.categorie === filterCategorie;
+      const matchSousCategorie =
+        filterSousCategorie === "" || t.sousCategorieId?.toString() === filterSousCategorie;
       const matchType = filterType === "" || t.type === filterType;
 
       const transactionDate = new Date(t.date);
@@ -418,6 +478,7 @@ export default function TransactionsPage() {
         matchSearch &&
         matchCompte &&
         matchCategorie &&
+        matchSousCategorie &&
         matchType &&
         matchMonth &&
         matchYear
@@ -427,12 +488,13 @@ export default function TransactionsPage() {
     searchTerm,
     filterCompte,
     filterCategorie,
+    filterSousCategorie,
     filterType,
     filterMonth,
     filterYear,
+    transactions,
     sortField,
     sortOrder,
-    transactions,
   ]);
 
   const totalMontant = useMemo(() => {
@@ -527,6 +589,7 @@ export default function TransactionsPage() {
           montant: montantAbsolu,
           type: selectedTransactionToModify.type,
           categorie: selectedTransactionToModify.categorie,
+          sousCategorie: selectedTransactionToModify.sousCategorieId?.toString() || "",
           compte: selectedTransactionToModify.compte,
           numeroCheque: selectedTransactionToModify.numeroCheque || "",
           numeroFacture: "",
@@ -636,11 +699,18 @@ export default function TransactionsPage() {
           ? `${descriptionWithFacture} (CHQ-${formData.numeroCheque})`
           : descriptionWithFacture;
 
+      // Vérifier que la sous-catégorie est sélectionnée
+      if (!formData.sousCategorie) {
+        showToast("La sous-catégorie est obligatoire", "error");
+        return;
+      }
+
       await api.put(`/transactions/${formData.id}`, {
         categorieId: parseInt(cat.id),
+        sousCategorieId: parseInt(formData.sousCategorie),
         compteId: acc.id,
         dateTransaction: formData.date,
-        description: descriptionWithCheque,
+        description: descriptionWithCheque || null,
         montant: parseFloat(formData.montant.toString().replace(/\s/g, '')),
         type: formData.type === 'Revenu' ? 'RECETTE' : 'DEPENSE'
       });
@@ -844,11 +914,18 @@ export default function TransactionsPage() {
         ? caisseAcc.id
         : acc.id;
 
+      // Vérifier que la sous-catégorie est sélectionnée
+      if (!formData.sousCategorie) {
+        showToast("La sous-catégorie est obligatoire", "error");
+        return;
+      }
+
       await api.post('/transactions', {
         categorieId: parseInt(cat.id),
+        sousCategorieId: parseInt(formData.sousCategorie),
         compteId: targetCompteId,
         dateTransaction: formData.date,
-        description: descriptionWithCheque,
+        description: descriptionWithCheque || null,
         montant: parseFloat(formData.montant.toString().replace(/\s/g, '')),
         type: formData.type === 'Revenu' ? 'RECETTE' : 'DEPENSE'
       });
@@ -985,7 +1062,10 @@ export default function TransactionsPage() {
             <MenuIcon />
             <select
               value={filterCategorie}
-              onChange={(e) => setFilterCategorie(e.target.value)}
+              onChange={(e) => {
+                setFilterCategorie(e.target.value);
+                setFilterSousCategorie(""); // Réinitialiser le filtre sous-catégorie
+              }}
               className="cursor-pointer bg-transparent text-sm outline-none"
             >
               <option value="">Toutes les catégories</option>
@@ -996,6 +1076,29 @@ export default function TransactionsPage() {
               ))}
             </select>
           </div>
+
+          {filterCategorie && (
+            <div className="flex items-center gap-2 rounded-full border border-black/10 bg-zinc-50 px-4 py-2">
+              <TagIcon />
+              <select
+                value={filterSousCategorie}
+                onChange={(e) => setFilterSousCategorie(e.target.value)}
+                className="cursor-pointer bg-transparent text-sm outline-none"
+              >
+                <option value="">Toutes les sous-catégories</option>
+                {sousCategoriesData
+                  .filter((sc) => {
+                    const selectedCat = categoriesData.find((c) => c.nom === filterCategorie);
+                    return selectedCat && sc.categorieId === parseInt(selectedCat.id);
+                  })
+                  .map((sc) => (
+                    <option key={sc.id} value={sc.id.toString()}>
+                      {sc.nom}
+                    </option>
+                  ))}
+              </select>
+            </div>
+          )}
 
           <div className="flex items-center gap-2 rounded-full border border-black/10 bg-zinc-50 px-4 py-2">
             <TagIcon />
@@ -1231,6 +1334,7 @@ export default function TransactionsPage() {
           handleInputChange={handleInputChange}
           handleTypeChange={handleTypeChange}
           availableCategories={availableCategories}
+          sousCategories={sousCategoriesData}
           isCaisseDisabled={isCaisseDisabled}
           showNumeroCheque={showNumeroCheque}
           soldeCaisse={soldeCaisse}
@@ -1293,6 +1397,7 @@ export default function TransactionsPage() {
           handleInputChange={handleInputChange}
           handleTypeChange={handleTypeChange}
           availableCategories={availableCategories}
+          sousCategories={sousCategoriesData}
           isCaisseDisabled={isCaisseDisabled}
           showNumeroCheque={showNumeroCheque}
           soldeCaisse={soldeCaisse}

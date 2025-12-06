@@ -16,6 +16,7 @@ import {
   CloseIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  EyeIcon,
 } from "@/components/Icons";
 
 // ====================================================================
@@ -30,6 +31,16 @@ type Category = {
   type: "Recette" | "Dépense";
   transactions: number; // Count from relation
   statut: "actif" | "inactif";
+};
+
+type SousCategorie = {
+  id: number;
+  nom: string;
+  categorieId: number;
+  statut: "ACTIF" | "INACTIF";
+  _count?: {
+    transactions: number;
+  };
 };
 
 // ====================================================================
@@ -172,6 +183,21 @@ export default function CategoriesPage() {
     statut: true,
   });
 
+  // États pour les sous-catégories
+  const [isSousCategorieModalOpen, setIsSousCategorieModalOpen] = useState(false);
+  const [isViewSousCategoriesModalOpen, setIsViewSousCategoriesModalOpen] = useState(false);
+  const [selectedCategoryForSousCategorie, setSelectedCategoryForSousCategorie] = useState<Category | null>(null);
+  const [sousCategories, setSousCategories] = useState<SousCategorie[]>([]);
+  const [sousCategorieFormData, setSousCategorieFormData] = useState({
+    nom: "",
+    statut: true,
+  });
+  const [editingSousCategorie, setEditingSousCategorie] = useState<SousCategorie | null>(null);
+  const [deleteSousCategorieConfirm, setDeleteSousCategorieConfirm] = useState<{ isOpen: boolean; sousCategorie: SousCategorie | null }>({
+    isOpen: false,
+    sousCategorie: null,
+  });
+
   const fetchCategories = async () => {
     try {
       setLoadingData(true);
@@ -299,6 +325,94 @@ export default function CategoriesPage() {
     setSearchTerm("");
   };
 
+  // Fonctions pour gérer les sous-catégories
+  const handleOpenAddSousCategorieModal = (category: Category) => {
+    setSelectedCategoryForSousCategorie(category);
+    setSousCategorieFormData({ nom: "", statut: true });
+    setEditingSousCategorie(null);
+    setIsSousCategorieModalOpen(true);
+  };
+
+  const handleViewSousCategories = async (category: Category) => {
+    setSelectedCategoryForSousCategorie(category);
+    try {
+      const response = await api.get(`/sous-categories?categorieId=${category.id}`);
+      setSousCategories(response.data.data || []);
+      setIsViewSousCategoriesModalOpen(true);
+    } catch (error) {
+      console.error("Erreur chargement sous-catégories:", error);
+      showToast("Erreur lors du chargement des sous-catégories", "error");
+    }
+  };
+
+  const handleCloseSousCategorieModal = () => {
+    setIsSousCategorieModalOpen(false);
+    setSelectedCategoryForSousCategorie(null);
+    setSousCategorieFormData({ nom: "", statut: true });
+    setEditingSousCategorie(null);
+  };
+
+  const handleSubmitSousCategorie = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCategoryForSousCategorie) return;
+
+    try {
+      const statutFinal = sousCategorieFormData.statut ? "ACTIF" : "INACTIF";
+      if (editingSousCategorie) {
+        await api.put(`/sous-categories/${editingSousCategorie.id}`, {
+          nom: sousCategorieFormData.nom,
+          statut: statutFinal
+        });
+        showToast("Sous-catégorie modifiée avec succès", "success");
+      } else {
+        await api.post('/sous-categories', {
+          nom: sousCategorieFormData.nom,
+          categorieId: parseInt(selectedCategoryForSousCategorie.id),
+          statut: statutFinal
+        });
+        showToast("Sous-catégorie créée avec succès", "success");
+      }
+      handleCloseSousCategorieModal();
+      if (isViewSousCategoriesModalOpen) {
+        handleViewSousCategories(selectedCategoryForSousCategorie);
+      }
+    } catch (error) {
+      console.error("Erreur sauvegarde sous-catégorie:", error);
+      showToast("Erreur lors de l'enregistrement", "error");
+    }
+  };
+
+  const handleEditSousCategorie = (sousCategorie: SousCategorie) => {
+    setEditingSousCategorie(sousCategorie);
+    setSousCategorieFormData({
+      nom: sousCategorie.nom,
+      statut: sousCategorie.statut === "ACTIF"
+    });
+    setIsViewSousCategoriesModalOpen(false);
+    setIsSousCategorieModalOpen(true);
+  };
+
+  const handleDeleteSousCategorieClick = (sousCategorie: SousCategorie) => {
+    setDeleteSousCategorieConfirm({ isOpen: true, sousCategorie });
+  };
+
+  const handleDeleteSousCategorieConfirm = async () => {
+    if (deleteSousCategorieConfirm.sousCategorie) {
+      try {
+        await api.delete(`/sous-categories/${deleteSousCategorieConfirm.sousCategorie.id}`);
+        showToast(`Sous-catégorie "${deleteSousCategorieConfirm.sousCategorie.nom}" supprimée`, "success");
+        if (selectedCategoryForSousCategorie) {
+          handleViewSousCategories(selectedCategoryForSousCategorie);
+        }
+      } catch (error) {
+        console.error("Erreur suppression sous-catégorie:", error);
+        showToast("Erreur lors de la suppression", "error");
+      } finally {
+        setDeleteSousCategorieConfirm({ isOpen: false, sousCategorie: null });
+      }
+    }
+  };
+
   if (isLoading || (loadingData && categories.length === 0)) {
     return <LoadingScreen />;
   }
@@ -410,14 +524,30 @@ export default function CategoriesPage() {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <button
+                        onClick={() => handleOpenAddSousCategorieModal(category)}
+                        className="rounded-lg p-2 text-black/60 transition hover:bg-blue-50 hover:text-blue-600"
+                        title="Ajouter une sous-catégorie"
+                      >
+                        <PlusIcon />
+                      </button>
+                      <button
+                        onClick={() => handleViewSousCategories(category)}
+                        className="rounded-lg p-2 text-black/60 transition hover:bg-green-50 hover:text-green-600"
+                        title="Voir les sous-catégories"
+                      >
+                        <EyeIcon />
+                      </button>
+                      <button
                         onClick={() => handleOpenModal(category)}
                         className="rounded-lg p-2 text-black/60 transition hover:bg-black/5 hover:text-black"
+                        title="Modifier"
                       >
                         <EditIcon />
                       </button>
                       <button
                         onClick={() => handleDeleteClick(category)}
                         className="rounded-lg p-2 text-black/60 transition hover:bg-red-50 hover:text-red-600"
+                        title="Supprimer"
                       >
                         <DeleteIcon />
                       </button>
@@ -471,6 +601,160 @@ export default function CategoriesPage() {
         cancelText="Annuler"
         onConfirm={handleDeleteConfirm}
         onCancel={handleDeleteCancel}
+        type="danger"
+      />
+
+      {/* Modal d'ajout/modification de sous-catégorie */}
+      {isSousCategorieModalOpen && selectedCategoryForSousCategorie && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-3xl border border-black/10 bg-white p-8 shadow-2xl">
+            <div className="mb-6 flex items-center justify-between">
+              <h2 className="text-xl font-bold">
+                {editingSousCategorie
+                  ? "Modifier la Sous-catégorie"
+                  : `Nouvelle Sous-catégorie - ${selectedCategoryForSousCategorie.nom}`}
+              </h2>
+              <button
+                onClick={handleCloseSousCategorieModal}
+                className="rounded-lg p-2 cursor-pointer text-black/40 transition hover:bg-black/5 hover:text-black"
+              >
+                <CloseIcon />
+              </button>
+            </div>
+            <form onSubmit={handleSubmitSousCategorie} className="space-y-6">
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-black">
+                  Nom de la Sous-catégorie
+                </label>
+                <input
+                  type="text"
+                  value={sousCategorieFormData.nom}
+                  onChange={(e) =>
+                    setSousCategorieFormData({ ...sousCategorieFormData, nom: e.target.value })
+                  }
+                  required
+                  className="w-full rounded-xl border border-black/20 bg-white px-4 py-3 text-sm outline-none transition focus:border-black focus:ring-2 focus:ring-black/20"
+                  placeholder="Entrer une sous-catégorie"
+                />
+              </div>
+              <div>
+                <label className="mb-3 block text-sm font-semibold text-black">
+                  Statut
+                </label>
+                <ToggleSwitch
+                  checked={sousCategorieFormData.statut}
+                  onChange={(checked) => setSousCategorieFormData({ ...sousCategorieFormData, statut: checked })}
+                />
+              </div>
+              <div className="flex gap-4 pt-4">
+                <button
+                  type="submit"
+                  className="flex-1 cursor-pointer rounded-2xl bg-black px-6 py-3 text-sm font-semibold text-white transition hover:bg-black/90"
+                >
+                  Enregistrer
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCloseSousCategorieModal}
+                  className="flex-1 cursor-pointer rounded-2xl border border-black/20 bg-white px-6 py-3 text-sm font-semibold text-black transition hover:bg-black/5"
+                >
+                  Annuler
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de visualisation des sous-catégories */}
+      {isViewSousCategoriesModalOpen && selectedCategoryForSousCategorie && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-2xl rounded-3xl border border-black/10 bg-white p-8 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="mb-6 flex items-center justify-between">
+              <h2 className="text-xl font-bold">
+                Sous-catégories de "{selectedCategoryForSousCategorie.nom}"
+              </h2>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleOpenAddSousCategorieModal(selectedCategoryForSousCategorie)}
+                  className="rounded-lg p-2 cursor-pointer text-black/60 transition hover:bg-blue-50 hover:text-blue-600"
+                  title="Ajouter une sous-catégorie"
+                >
+                  <PlusIcon />
+                </button>
+                <button
+                  onClick={() => {
+                    setIsViewSousCategoriesModalOpen(false);
+                    setSelectedCategoryForSousCategorie(null);
+                  }}
+                  className="rounded-lg p-2 cursor-pointer text-black/40 transition hover:bg-black/5 hover:text-black"
+                >
+                  <CloseIcon />
+                </button>
+              </div>
+            </div>
+            {sousCategories.length === 0 ? (
+              <div className="py-12 text-center text-black/40">
+                <p className="text-sm">Aucune sous-catégorie pour cette catégorie</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {sousCategories.map((sousCategorie) => (
+                  <div
+                    key={sousCategorie.id}
+                    className="flex items-center justify-between rounded-xl border border-black/5 bg-white p-4 transition hover:bg-zinc-50"
+                  >
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{sousCategorie.nom}</p>
+                      <p className="text-xs text-black/50">
+                        {sousCategorie._count?.transactions || 0} transaction(s)
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${sousCategorie.statut === "ACTIF"
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-red-50 text-red-700"
+                          }`}
+                      >
+                        <span
+                          className={`h-2 w-2 rounded-full ${sousCategorie.statut === "ACTIF" ? "bg-emerald-500" : "bg-red-500"
+                            }`}
+                        />
+                        {sousCategorie.statut === "ACTIF" ? "Actif" : "Inactif"}
+                      </span>
+                      <button
+                        onClick={() => handleEditSousCategorie(sousCategorie)}
+                        className="rounded-lg p-2 text-black/60 transition hover:bg-black/5 hover:text-black"
+                        title="Modifier"
+                      >
+                        <EditIcon />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteSousCategorieClick(sousCategorie)}
+                        className="rounded-lg p-2 text-black/60 transition hover:bg-red-50 hover:text-red-600"
+                        title="Supprimer"
+                      >
+                        <DeleteIcon />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal de confirmation de suppression de sous-catégorie */}
+      <ConfirmModal
+        isOpen={deleteSousCategorieConfirm.isOpen}
+        title="Confirmer la suppression"
+        message={`Êtes-vous sûr de vouloir supprimer la sous-catégorie "${deleteSousCategorieConfirm.sousCategorie?.nom}" ? Cette action est irréversible.`}
+        confirmText="Supprimer"
+        cancelText="Annuler"
+        onConfirm={handleDeleteSousCategorieConfirm}
+        onCancel={() => setDeleteSousCategorieConfirm({ isOpen: false, sousCategorie: null })}
         type="danger"
       />
     </div>
