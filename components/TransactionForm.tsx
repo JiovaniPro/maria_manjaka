@@ -2,6 +2,7 @@
 
 import React from "react";
 import { CloseIcon } from "@/components/Icons";
+import { formatNumberWithSpaces, removeNumberSpaces } from "@/lib/helpers";
 
 type Category = {
     id: string;
@@ -129,15 +130,29 @@ export function TransactionForm({
                                 Montant (Ar)
                             </label>
                             <input
-                                type="number"
+                                type="text"
                                 name="montant"
-                                value={formData.montant}
-                                onChange={handleInputChange}
-                                min="1"
-                                step="1"
+                                value={formatNumberWithSpaces(formData.montant || "")}
+                                onChange={(e) => {
+                                    // Enlever les espaces avant de stocker
+                                    const rawValue = removeNumberSpaces(e.target.value);
+                                    // Créer un nouvel event avec la valeur sans espaces
+                                    const syntheticEvent = {
+                                        ...e,
+                                        target: {
+                                            ...e.target,
+                                            name: e.target.name,
+                                            value: rawValue,
+                                        },
+                                    };
+                                    handleInputChange(syntheticEvent as React.ChangeEvent<HTMLInputElement>);
+                                }}
+                                inputMode="numeric"
+                                pattern="[0-9\s]*"
                                 required
                                 key="montant-input"
-                                className="w-full rounded-xl border border-black/10 bg-zinc-50 p-3 text-sm focus:border-blue-500 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                className="w-full rounded-xl border border-black/10 bg-zinc-50 p-3 text-sm focus:border-blue-500 focus:ring-blue-500"
+                                placeholder="Ex: 100 000"
                             />
                         </div>
                     </div>

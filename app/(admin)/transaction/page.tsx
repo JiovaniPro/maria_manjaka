@@ -450,7 +450,7 @@ export default function TransactionsPage() {
     (cat) => cat.type === formData.type && cat.statut === "actif"
   );
 
-  const montantNumber = parseFloat(formData.montant) || 0;
+  const montantNumber = parseFloat(formData.montant.toString().replace(/\s/g, '')) || 0;
   const isCaisseDisabled =
     formData.type === "Dépense" && montantNumber > soldeCaisse;
   const selectedAccountType = getSelectedAccountType(formData.compte);
@@ -636,7 +636,7 @@ export default function TransactionsPage() {
         compteId: acc.id,
         dateTransaction: formData.date,
         description: descriptionWithCheque,
-        montant: parseFloat(formData.montant),
+        montant: parseFloat(formData.montant.toString().replace(/\s/g, '')),
         type: formData.type === 'Revenu' ? 'RECETTE' : 'DEPENSE'
       });
 
@@ -795,7 +795,7 @@ export default function TransactionsPage() {
           compteId: acc.id,
           dateOperation: formData.date,
           description: formData.description,
-          montant: parseFloat(formData.montant),
+          montant: parseFloat(formData.montant.toString().replace(/\s/g, '')),
           type: 'RETRAIT',
           numeroCheque: formData.numeroCheque
         });
@@ -812,7 +812,7 @@ export default function TransactionsPage() {
         compteId: targetCompteId,
         dateTransaction: formData.date,
         description: descriptionWithCheque,
-        montant: parseFloat(formData.montant),
+        montant: parseFloat(formData.montant.toString().replace(/\s/g, '')),
         type: formData.type === 'Revenu' ? 'RECETTE' : 'DEPENSE'
       });
 

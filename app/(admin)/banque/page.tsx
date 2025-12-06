@@ -47,6 +47,7 @@ type BankAccount = {
 // ====================================================================
 
 import { useAdminPassword } from "@/hooks/useAdminPassword";
+import { formatNumberWithSpaces, removeNumberSpaces } from "@/lib/helpers";
 
 const months = [
   { value: "", label: "Tous les mois" },
@@ -219,13 +220,21 @@ const ModalForm: React.FC<ModalFormProps> = ({ title, onSubmit, onClose, formDat
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    // Si c'est le champ montant, enlever les espaces avant de stocker
+    if (name === "montant") {
+      const rawValue = removeNumberSpaces(value);
+      // Convertir en nombre si c'est un nombre valide, sinon garder comme string
+      const numericValue = rawValue === "" ? "" : (isNaN(Number(rawValue)) ? rawValue : rawValue);
+      setFormData((prev) => ({ ...prev, [name]: numericValue }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
   };
 
   // Handler pour pré-remplir avec le solde de caisse réel
   const handleSetCaisseBalance = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
-    setFormData((prev) => ({ ...prev, montant: caisseBalance }));
+    setFormData((prev) => ({ ...prev, montant: caisseBalance.toString() }));
     showToast(`Montant Caisse (${caisseBalance.toLocaleString('fr-FR')} Ar) pré-rempli.`, "info");
   };
 
@@ -248,13 +257,15 @@ const ModalForm: React.FC<ModalFormProps> = ({ title, onSubmit, onClose, formDat
               <label className="mb-1 block text-sm font-semibold">Montant (Ar)</label>
               <div className="relative">
                 <input
-                  type="number"
+                  type="text"
                   name="montant"
-                  required min="0.01"
-                  step="0.01"
-                  value={formData.montant || ""}
+                  required
+                  inputMode="numeric"
+                  pattern="[0-9\s.]*"
+                  value={formatNumberWithSpaces(formData.montant?.toString() || "")}
                   onChange={handleInputChange}
-                  className="w-full rounded-xl border border-black/10 bg-zinc-50 p-3 text-sm pr-[100px] focus:border-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  className="w-full rounded-xl border border-black/10 bg-zinc-50 p-3 text-sm pr-[100px] focus:border-blue-500"
+                  placeholder="Ex: 100 000"
                 />
                 {/* Bouton Caisse visible seulement pour l'ajout d'un Dépôt */}
                 {isNewDeposit && (
@@ -468,7 +479,7 @@ export default function BanquePage() {
         const payload = {
           dateOperation: formData.date,
           description: formData.description,
-          montant: Math.abs(Number(formData.montant)),
+          montant: Math.abs(Number(removeNumberSpaces(String(formData.montant || "0")))),
           type: formData.type === "Retrait" ? "RETRAIT" : "DEPOT",
           numeroCheque: formData.numeroCheque
         };
@@ -489,7 +500,7 @@ export default function BanquePage() {
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
     const type = formData.type || (activeTab === "retrait" ? "Retrait" : "Dépôt");
-    const montant = Number(formData.montant);
+    const montant = Number(removeNumberSpaces(String(formData.montant || "0")));
 
     if (type === "Retrait" && !formData.numeroCheque) {
       showToast("Le N° Chèque est obligatoire pour un Retrait.", "warning");

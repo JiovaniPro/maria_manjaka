@@ -69,3 +69,25 @@ export function formatFullDate(dateString: string): string {
     const date = new Date(dateString);
     return date.toLocaleDateString('fr-FR');
 }
+
+// Formater un nombre avec des espaces tous les 3 chiffres (ex: 100000 -> "100 000")
+export function formatNumberWithSpaces(value: string | number): string {
+    // Enlever tous les espaces et caractères non numériques sauf le point pour les décimales
+    const numericValue = String(value).replace(/[^\d.]/g, '');
+    
+    // Séparer la partie entière et décimale
+    const parts = numericValue.split('.');
+    const integerPart = parts[0];
+    const decimalPart = parts[1];
+    
+    // Formater la partie entière avec des espaces tous les 3 chiffres
+    const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    
+    // Reconstruire avec la partie décimale si elle existe
+    return decimalPart ? `${formattedInteger}.${decimalPart}` : formattedInteger;
+}
+
+// Enlever les espaces d'un nombre formaté (ex: "100 000" -> "100000")
+export function removeNumberSpaces(value: string): string {
+    return value.replace(/\s/g, '');
+}
