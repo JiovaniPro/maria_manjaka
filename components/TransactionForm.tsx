@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { CloseIcon } from "@/components/Icons";
 import { formatNumberWithSpaces, removeNumberSpaces } from "@/lib/helpers";
 
@@ -33,6 +33,7 @@ type TransactionFormProps = {
     handleInputChange: (
         e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
     ) => void;
+    handleSousCategorieChange?: (selectedIds: string[]) => void;
     handleTypeChange: (newType: "Revenu" | "Dépense") => void;
     availableCategories: Category[];
     sousCategories?: SousCategorie[];
@@ -57,6 +58,7 @@ export function TransactionForm({
     isModification = false,
     formData,
     handleInputChange,
+    handleSousCategorieChange,
     handleTypeChange,
     availableCategories,
     sousCategories = [],
@@ -74,6 +76,47 @@ export function TransactionForm({
     submitDisabled = false,
 }: TransactionFormProps) {
     const selectValue = lockCompte && lockedCompteName ? lockedCompteName : formData.compte;
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    // Convertir formData.sousCategorie en tableau si c'est une string (pour compatibilité)
+    const selectedSousCategorieIds = Array.isArray(formData.sousCategorie) 
+        ? formData.sousCategorie 
+        : formData.sousCategorie 
+            ? [formData.sousCategorie] 
+            : [];
+
+    // Fermer le dropdown quand on clique en dehors
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsDropdownOpen(false);
+            }
+        };
+
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, []);
+
+    const toggleSousCategorie = (sousCategorieId: string) => {
+        const newSelected = selectedSousCategorieIds.includes(sousCategorieId)
+            ? selectedSousCategorieIds.filter(id => id !== sousCategorieId)
+            : [...selectedSousCategorieIds, sousCategorieId];
+        
+        if (handleSousCategorieChange) {
+            handleSousCategorieChange(newSelected);
+        }
+    };
+
+    const removeSousCategorie = (sousCategorieId: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        const newSelected = selectedSousCategorieIds.filter(id => id !== sousCategorieId);
+        if (handleSousCategorieChange) {
+            handleSousCategorieChange(newSelected);
+        }
+    };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -210,32 +253,110 @@ export function TransactionForm({
                             <label className="mb-2 block text-sm font-semibold text-black">
                                 Sous-catégorie <span className="text-red-500">*</span>
                             </label>
-                            <select
-                                name="sousCategorie"
-                                value={formData.sousCategorie || ""}
-                                onChange={handleInputChange}
-                                required
-                                disabled={!formData.categorie || sousCategories.length === 0}
-                                className="w-full rounded-xl border border-black/10 bg-zinc-50 p-3 text-sm focus:border-blue-500 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-zinc-100"
-                            >
-                                <option value="" disabled>
-                                    {!formData.categorie 
-                                        ? "Sélectionner d'abord une catégorie"
-                                        : sousCategories.length === 0
-                                        ? "Aucune sous-catégorie disponible - Créez-en une dans la page Catégories"
-                                        : "Sélectionner une sous-catégorie"}
-                                </option>
-                                {sousCategories.map((sc) => (
-                                    <option key={sc.id} value={sc.id.toString()}>
-                                        {sc.nom}
-                                    </option>
-                                ))}
-                            </select>
-                            {formData.categorie && sousCategories.length === 0 && (
-                                <p className="mt-2 text-xs text-red-500">
-                                    Aucune sous-catégorie disponible. Veuillez créer une sous-catégorie pour cette catégorie dans la page Catégories.
-                                </p>
-                            )}
+                            <div className="relative" ref={dropdownRef}>
+                                {/* Dropdown Button */}
+                                <button
+                                    type="button"
+                                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                                    disabled={!formData.categorie || sousCategories.length === 0}
+                                    className={`w-full rounded-xl border border-black/10 bg-zinc-50 p-3 text-sm text-left focus:border-blue-500 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-zinc-100 flex items-center justify-between ${
+                                        !formData.categorie || sousCategories.length === 0
+                                            ? "text-black/40"
+                                            : "text-black"
+                                    }`}
+                                >
+                                    <span>
+                                        {!formData.categorie 
+                                            ? "Sélectionner d'abord une catégorie"
+                                            : sousCategories.length === 0
+                                            ? "Aucune sous-catégorie disponible"
+                                            : selectedSousCategorieIds.length === 0
+                                            ? "Sélectionner une ou plusieurs sous-catégories"
+                                            : `${selectedSousCategorieIds.length} sous-catégorie(s) sélectionnée(s)`}
+                                    </span>
+                                    <svg
+                                        className={`h-4 w-4 transition-transform ${isDropdownOpen ? "rotate-180" : ""}`}
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </button>
+
+                                {/* Dropdown Menu */}
+                                {isDropdownOpen && formData.categorie && sousCategories.length > 0 && (
+                                    <div className="absolute z-50 mt-1 w-full max-h-60 overflow-auto rounded-xl border border-black/10 bg-white shadow-lg">
+                                        {sousCategories.map((sc) => {
+                                            const isSelected = selectedSousCategorieIds.includes(sc.id.toString());
+                                            return (
+                                                <div
+                                                    key={sc.id}
+                                                    onClick={() => toggleSousCategorie(sc.id.toString())}
+                                                    className={`px-4 py-2 cursor-pointer hover:bg-blue-50 transition ${
+                                                        isSelected ? "bg-blue-100" : ""
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center">
+                                                        <div className={`w-4 h-4 rounded border-2 mr-2 flex items-center justify-center ${
+                                                            isSelected 
+                                                                ? "bg-blue-500 border-blue-500" 
+                                                                : "border-black/20"
+                                                        }`}>
+                                                            {isSelected && (
+                                                                <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                                                </svg>
+                                                            )}
+                                                        </div>
+                                                        <span className="text-sm">{sc.nom}</span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+
+                                {/* Selected Chips */}
+                                {selectedSousCategorieIds.length > 0 && (
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                        {selectedSousCategorieIds.map((id) => {
+                                            const sousCategorie = sousCategories.find(sc => sc.id.toString() === id);
+                                            if (!sousCategorie) return null;
+                                            return (
+                                                <span
+                                                    key={id}
+                                                    className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800 border border-blue-200"
+                                                >
+                                                    {sousCategorie.nom}
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => removeSousCategorie(id, e)}
+                                                        className="ml-1 rounded-full hover:bg-blue-200 p-0.5 transition flex items-center justify-center"
+                                                        aria-label="Supprimer"
+                                                    >
+                                                        <svg 
+                                                            viewBox="0 0 24 24" 
+                                                            className="h-3 w-3" 
+                                                            fill="none" 
+                                                            stroke="currentColor" 
+                                                            strokeWidth="2"
+                                                        >
+                                                            <path d="M18 6L6 18M6 6l12 12" />
+                                                        </svg>
+                                                    </button>
+                                                </span>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+
+                                {formData.categorie && sousCategories.length === 0 && (
+                                    <p className="mt-2 text-xs text-red-500">
+                                        Aucune sous-catégorie disponible. Veuillez créer une sous-catégorie pour cette catégorie dans la page Catégories.
+                                    </p>
+                                )}
+                            </div>
                         </div>
 
                         {/* Compte */}

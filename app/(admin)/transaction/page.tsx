@@ -42,7 +42,7 @@ type Transaction = {
   montantAffiche?: string;
   type: "Revenu" | "Dépense";
   categorie: string;
-  sousCategorie?: string;
+  sousCategorie?: string | string[]; // Supporte string (ancien format) et string[] (nouveau format)
   compte: string;
   numeroCheque?: string;
   categorieId?: number; // Pour l'API
@@ -184,7 +184,7 @@ export default function TransactionsPage() {
     montant: "",
     type: "Revenu" as "Revenu" | "Dépense",
     categorie: "",
-    sousCategorie: "",
+    sousCategorie: [] as string[],
     compte: "",
     numeroCheque: "",
     numeroFacture: "",
@@ -220,6 +220,40 @@ export default function TransactionsPage() {
   };
   const [chequeStatus, setChequeStatus] = useState<"idle" | "checking" | "exists" | "free">("idle");
 
+  // Fonction pour extraire la description, le numéro de facture, le numéro de chèque et les sous-catégories
+  const extractDescriptionParts = (fullDescription: string) => {
+    let description = fullDescription || "";
+    let numeroFacture = "";
+    let numeroCheque = "";
+    let sousCategoriesIds: string[] = [];
+
+    // Extraire les sous-catégories depuis "(SC:1,2,3)"
+    const sousCategoriesMatch = description.match(/\(SC:([^)]+)\)/);
+    if (sousCategoriesMatch) {
+      sousCategoriesIds = sousCategoriesMatch[1].split(',').map(id => id.trim());
+      description = description.replace(/\(SC:[^)]+\)/g, "").trim();
+    }
+
+    // Extraire le numéro de facture depuis "(Facture: XXX)"
+    const factureMatch = description.match(/\(Facture:\s*([^)]+)\)/);
+    if (factureMatch) {
+      numeroFacture = factureMatch[1].trim();
+      description = description.replace(/\(Facture:\s*[^)]+\)/g, "").trim();
+    }
+
+    // Extraire le numéro de chèque depuis "(CHQ-XXX)"
+    const chequeMatch = description.match(/\(CHQ-([\w-]+)\)/);
+    if (chequeMatch) {
+      numeroCheque = chequeMatch[1].trim();
+      description = description.replace(/\(CHQ-[\w-]+\)/g, "").trim();
+    }
+
+    // Nettoyer les espaces multiples et les espaces en début/fin
+    description = description.replace(/\s+/g, " ").trim();
+
+    return { description, numeroFacture, numeroCheque, sousCategoriesIds };
+  };
+
   // --- Fetch Data
   const fetchData = async () => {
     try {
@@ -232,6 +266,10 @@ export default function TransactionsPage() {
       // 2. Categories
       const categoriesRes = await api.get('/categories');
       const categoriesApi = categoriesRes.data.data;
+
+      // 2.5. Sous-catégories (pour mapper les IDs aux noms)
+      const sousCategoriesRes = await api.get('/sous-categories?statut=ACTIF');
+      const sousCategoriesApi = sousCategoriesRes.data.data || [];
 
       // 3. Comptes
       const comptesRes = await api.get('/comptes');
@@ -258,6 +296,26 @@ export default function TransactionsPage() {
         const chequeMatch = description?.match(/CHQ-([\w-]+)/);
         // Si la dépense a un chèque, elle a été payée via banque : afficher la banque même si la contrepartie comptable est en caisse
         const isBankPaidExpense = t.type === 'DEPENSE' && (t.numeroCheque || chequeMatch) && banque?.nom;
+        
+        // Extraire les sous-catégories depuis la description
+        const { sousCategoriesIds } = extractDescriptionParts(description);
+        let sousCategorieNames: string[] = [];
+        
+        if (sousCategoriesIds.length > 0) {
+          // Mapper les IDs aux noms de sous-catégories
+          sousCategorieNames = sousCategoriesIds
+            .map(id => {
+              const sousCat = sousCategoriesApi.find((sc: any) => sc.id.toString() === id);
+              return sousCat?.nom;
+            })
+            .filter(Boolean) as string[];
+        }
+        
+        // Si aucune sous-catégorie trouvée dans la description, utiliser celle de l'API
+        if (sousCategorieNames.length === 0 && t.sousCategorie?.nom) {
+          sousCategorieNames = [t.sousCategorie.nom];
+        }
+        
         return {
           id: t.id.toString(),
           date: formatDate(t.dateTransaction),
@@ -266,7 +324,7 @@ export default function TransactionsPage() {
           montantAffiche: t.type === 'RECETTE' ? `+${formatCurrency(t.montant)}` : `-${formatCurrency(t.montant)}`,
           type: t.type === 'RECETTE' ? 'Revenu' : 'Dépense',
           categorie: t.categorie?.nom || 'Inconnue',
-          sousCategorie: t.sousCategorie?.nom || '',
+          sousCategorie: sousCategorieNames.length > 0 ? sousCategorieNames : (t.sousCategorie?.nom || ''),
           compte: isBankPaidExpense ? banque!.nom : (t.compte?.nom || 'Inconnu'),
           numeroCheque: t.numeroCheque || (chequeMatch ? chequeMatch[1] : undefined),
           categorieId: t.categorieId,
@@ -311,16 +369,51 @@ export default function TransactionsPage() {
           if (selectedCat) {
             const response = await api.get(`/sous-categories?categorieId=${selectedCat.id}&statut=ACTIF`);
             setSousCategoriesData(response.data.data || []);
+            // Ne réinitialiser les sous-catégories que si :
+            // 1. Elles sont vides ET
+            // 2. On n'est pas en mode modification (pas d'ID de transaction)
+            setFormData(prev => {
+              // Si on est en mode modification (formData.id existe), ne pas réinitialiser les sous-catégories
+              if (prev.id) {
+                return prev;
+              }
+              // Si on a déjà des sous-catégories sélectionnées, on les garde
+              if (prev.sousCategorie && prev.sousCategorie.length > 0) {
+                return prev;
+              }
+              // Sinon, on réinitialise (cas de la création ou changement de catégorie)
+              return { ...prev, sousCategorie: [] };
+            });
           } else {
             setSousCategoriesData([]);
+            // Ne réinitialiser que si on n'est pas en mode modification
+            setFormData(prev => {
+              if (prev.id) {
+                return prev;
+              }
+              return { ...prev, sousCategorie: [] };
+            });
           }
         } catch (error) {
           console.error("Erreur chargement sous-catégories:", error);
           setSousCategoriesData([]);
+          // Ne réinitialiser que si on n'est pas en mode modification
+          setFormData(prev => {
+            if (prev.id) {
+              return prev;
+            }
+            return { ...prev, sousCategorie: [] };
+          });
         }
       } else {
         setSousCategoriesData([]);
-        setFormData(prev => ({ ...prev, sousCategorie: "" }));
+        // Ne réinitialiser que si on n'est pas en mode modification
+        setFormData(prev => {
+          if (prev.id) {
+            return prev;
+          }
+          return { ...prev, sousCategorie: [] };
+        });
       }
     };
     loadSousCategories();
@@ -382,6 +475,13 @@ export default function TransactionsPage() {
     setFormData((prev) => ({
       ...prev,
       [name]: value,
+    }));
+  };
+
+  const handleSousCategorieChange = (selectedIds: string[]) => {
+    setFormData((prev) => ({
+      ...prev,
+      sousCategorie: selectedIds,
     }));
   };
 
@@ -563,32 +663,6 @@ export default function TransactionsPage() {
 
   // --- Security & Modify Logic
 
-  // Fonction pour extraire la description, le numéro de facture et le numéro de chèque
-  const extractDescriptionParts = (fullDescription: string) => {
-    let description = fullDescription || "";
-    let numeroFacture = "";
-    let numeroCheque = "";
-
-    // Extraire le numéro de facture depuis "(Facture: XXX)"
-    const factureMatch = description.match(/\(Facture:\s*([^)]+)\)/);
-    if (factureMatch) {
-      numeroFacture = factureMatch[1].trim();
-      description = description.replace(/\(Facture:\s*[^)]+\)/g, "").trim();
-    }
-
-    // Extraire le numéro de chèque depuis "(CHQ-XXX)"
-    const chequeMatch = description.match(/\(CHQ-([\w-]+)\)/);
-    if (chequeMatch) {
-      numeroCheque = chequeMatch[1].trim();
-      description = description.replace(/\(CHQ-[\w-]+\)/g, "").trim();
-    }
-
-    // Nettoyer les espaces multiples et les espaces en début/fin
-    description = description.replace(/\s+/g, " ").trim();
-
-    return { description, numeroFacture, numeroCheque };
-  };
-
   const startView = (transaction: Transaction) => {
     setSelectedTransactionToView(transaction);
     setIsViewModalOpen(true);
@@ -600,7 +674,7 @@ export default function TransactionsPage() {
     setIsAuthModalOpen(true);
   };
 
-  const handleAuthSubmit = (e: React.FormEvent) => {
+  const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (authPassword === adminPassword) {
       resetFailedAttempts();
@@ -615,11 +689,47 @@ export default function TransactionsPage() {
           selectedTransactionToModify.montant
         ).toString();
         
-        // Extraire les parties de la description
-        const { description, numeroFacture, numeroCheque } = extractDescriptionParts(
+        // Extraire les parties de la description (y compris les sous-catégories)
+        const { description, numeroFacture, numeroCheque, sousCategoriesIds } = extractDescriptionParts(
           selectedTransactionToModify.description
         );
 
+        // Déterminer les sous-catégories à pré-remplir
+        let sousCategoriesToSet: string[] = [];
+        
+        // Si on a des IDs de sous-catégories dans la description, les utiliser
+        if (sousCategoriesIds.length > 0) {
+          sousCategoriesToSet = sousCategoriesIds;
+        } 
+        // Sinon, utiliser l'ID de sous-catégorie de l'API (pour compatibilité avec les anciennes transactions)
+        else if (selectedTransactionToModify.sousCategorieId) {
+          sousCategoriesToSet = [selectedTransactionToModify.sousCategorieId.toString()];
+        }
+        // Sinon, si on a des noms de sous-catégories (format tableau), les convertir en IDs
+        else if (Array.isArray(selectedTransactionToModify.sousCategorie) && selectedTransactionToModify.sousCategorie.length > 0) {
+          // Les sous-catégories sont déjà des IDs dans ce cas (format string[])
+          sousCategoriesToSet = selectedTransactionToModify.sousCategorie as string[];
+        }
+        // Sinon, si c'est une string, essayer de trouver l'ID correspondant
+        else if (typeof selectedTransactionToModify.sousCategorie === 'string' && selectedTransactionToModify.sousCategorie) {
+          // Pour les anciennes transactions, on utilisera l'ID de l'API
+          if (selectedTransactionToModify.sousCategorieId) {
+            sousCategoriesToSet = [selectedTransactionToModify.sousCategorieId.toString()];
+          }
+        }
+
+        // Charger les sous-catégories de la catégorie sélectionnée avant d'ouvrir le modal
+        try {
+          const selectedCat = categoriesData.find((c) => c.nom === selectedTransactionToModify.categorie);
+          if (selectedCat) {
+            const response = await api.get(`/sous-categories?categorieId=${selectedCat.id}&statut=ACTIF`);
+            setSousCategoriesData(response.data.data || []);
+          }
+        } catch (error) {
+          console.error("Erreur chargement sous-catégories pour modification:", error);
+        }
+
+        // Définir le formData avec toutes les données, y compris les sous-catégories
         setFormData({
           id: selectedTransactionToModify.id,
           date: selectedTransactionToModify.date,
@@ -627,7 +737,7 @@ export default function TransactionsPage() {
           montant: montantAbsolu,
           type: selectedTransactionToModify.type,
           categorie: selectedTransactionToModify.categorie,
-          sousCategorie: selectedTransactionToModify.sousCategorieId?.toString() || "",
+          sousCategorie: sousCategoriesToSet,
           compte: selectedTransactionToModify.compte,
           numeroCheque: numeroCheque || selectedTransactionToModify.numeroCheque || "",
           numeroFacture: numeroFacture,
@@ -744,17 +854,32 @@ export default function TransactionsPage() {
           : descriptionWithFacture;
 
       // Vérifier que la sous-catégorie est sélectionnée
-      if (!formData.sousCategorie) {
+      const sousCategorieArray = Array.isArray(formData.sousCategorie) 
+        ? formData.sousCategorie 
+        : formData.sousCategorie 
+          ? [formData.sousCategorie] 
+          : [];
+      
+      if (sousCategorieArray.length === 0) {
         showToast("La sous-catégorie est obligatoire", "error");
         return;
       }
 
+      // Pour l'API, on prend la première sous-catégorie sélectionnée (l'API ne supporte qu'une seule)
+      const firstSousCategorieId = sousCategorieArray[0];
+      
+      // Stocker toutes les sous-catégories sélectionnées dans la description pour pouvoir les récupérer plus tard
+      const sousCategoriesIds = sousCategorieArray.join(',');
+      const descriptionWithSousCategories = sousCategorieArray.length > 1
+        ? `${descriptionWithCheque || ''} (SC:${sousCategoriesIds})`
+        : descriptionWithCheque;
+
       await api.put(`/transactions/${formData.id}`, {
         categorieId: parseInt(cat.id),
-        sousCategorieId: parseInt(formData.sousCategorie),
+        sousCategorieId: parseInt(firstSousCategorieId),
         compteId: acc.id,
         dateTransaction: formData.date,
-        description: descriptionWithCheque || null,
+        description: descriptionWithSousCategories || null,
         montant: parseFloat(formData.montant.toString().replace(/\s/g, '')),
         type: formData.type === 'Revenu' ? 'RECETTE' : 'DEPENSE'
       });
@@ -782,7 +907,7 @@ export default function TransactionsPage() {
         montant: "",
         type: "Revenu",
         categorie: "",
-        sousCategorie: "",
+        sousCategorie: [],
         compte: "",
         numeroCheque: "",
         numeroFacture: "",
@@ -960,17 +1085,32 @@ export default function TransactionsPage() {
         : acc.id;
 
       // Vérifier que la sous-catégorie est sélectionnée
-      if (!formData.sousCategorie) {
+      const sousCategorieArray = Array.isArray(formData.sousCategorie) 
+        ? formData.sousCategorie 
+        : formData.sousCategorie 
+          ? [formData.sousCategorie] 
+          : [];
+      
+      if (sousCategorieArray.length === 0) {
         showToast("La sous-catégorie est obligatoire", "error");
         return;
       }
 
+      // Pour l'API, on prend la première sous-catégorie sélectionnée (l'API ne supporte qu'une seule)
+      const firstSousCategorieId = sousCategorieArray[0];
+      
+      // Stocker toutes les sous-catégories sélectionnées dans la description pour pouvoir les récupérer plus tard
+      const sousCategoriesIds = sousCategorieArray.join(',');
+      const descriptionWithSousCategories = sousCategorieArray.length > 1
+        ? `${descriptionWithCheque || ''} (SC:${sousCategoriesIds})`
+        : descriptionWithCheque;
+
       await api.post('/transactions', {
         categorieId: parseInt(cat.id),
-        sousCategorieId: parseInt(formData.sousCategorie),
+        sousCategorieId: parseInt(firstSousCategorieId),
         compteId: targetCompteId,
         dateTransaction: formData.date,
-        description: descriptionWithCheque || null,
+        description: descriptionWithSousCategories || null,
         montant: parseFloat(formData.montant.toString().replace(/\s/g, '')),
         type: formData.type === 'Revenu' ? 'RECETTE' : 'DEPENSE'
       });
@@ -997,7 +1137,7 @@ export default function TransactionsPage() {
         montant: "",
         type: "Revenu",
         categorie: "",
-        sousCategorie: "",
+        sousCategorie: [],
         compte: defaultCaisseName,
         numeroCheque: "",
         numeroFacture: "",
@@ -1391,6 +1531,7 @@ export default function TransactionsPage() {
           onSubmit={handleAddTransaction}
           formData={formData}
           handleInputChange={handleInputChange}
+          handleSousCategorieChange={handleSousCategorieChange}
           handleTypeChange={handleTypeChange}
           availableCategories={availableCategories}
           sousCategories={sousCategoriesData}
@@ -1454,6 +1595,7 @@ export default function TransactionsPage() {
           isModification={true}
           formData={formData}
           handleInputChange={handleInputChange}
+          handleSousCategorieChange={handleSousCategorieChange}
           handleTypeChange={handleTypeChange}
           availableCategories={availableCategories}
           sousCategories={sousCategoriesData}
@@ -1469,60 +1611,128 @@ export default function TransactionsPage() {
         />
       )}
 
-      {isViewModalOpen && selectedTransactionToView && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-3xl border border-black/10 bg-white p-6 shadow-2xl">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <p
-                  className={`text-xs font-semibold uppercase tracking-[0.3em] ${selectedTransactionToView.type === "Revenu" ? "text-emerald-500" : "text-red-500"
-                    }`}
-                >
-                  {selectedTransactionToView.type === "Revenu" ? "Recette" : "Dépense"}
-                </p>
-                <h3 className="text-lg font-bold text-black">Détails de la transaction</h3>
-              </div>
-              <button
-                onClick={() => setIsViewModalOpen(false)}
-                className="rounded-full p-2 text-black/50 transition hover:bg-zinc-100 hover:text-black"
-              >
-                <CloseIcon />
-              </button>
-            </div>
+      {isViewModalOpen && selectedTransactionToView && (() => {
+        // Extraire les informations de la description
+        const { description, numeroFacture, numeroCheque: extractedCheque } = extractDescriptionParts(selectedTransactionToView.description);
+        const displayCheque = selectedTransactionToView.numeroCheque || extractedCheque;
+        
+        // Gérer les sous-catégories (peuvent être string ou array)
+        const sousCategorieArray = Array.isArray(selectedTransactionToView.sousCategorie)
+          ? selectedTransactionToView.sousCategorie
+          : selectedTransactionToView.sousCategorie
+            ? [selectedTransactionToView.sousCategorie]
+            : [];
 
-            <div className="space-y-3 text-sm text-black/80">
-              <div className="flex justify-between">
-                <span className="text-black/60">Date</span>
-                <span className="font-semibold">{selectedTransactionToView.date}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-black/60">Description</span>
-                <span className="font-semibold text-right">{selectedTransactionToView.description}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-black/60">Catégorie</span>
-                <span className="font-semibold">{selectedTransactionToView.categorie}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-black/60">Compte</span>
-                <span className="font-semibold">{selectedTransactionToView.compte}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-black/60">Montant</span>
-                <span className={`font-bold ${selectedTransactionToView.type === "Revenu" ? "text-emerald-600" : "text-red-600"}`}>
-                  {selectedTransactionToView.montantAffiche}
-                </span>
-              </div>
-              {selectedTransactionToView.numeroCheque && (
-                <div className="flex justify-between">
-                  <span className="text-black/60">Chèque</span>
-                  <span className="font-semibold">CHQ-{selectedTransactionToView.numeroCheque}</span>
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="w-full max-w-lg rounded-3xl border border-black/10 bg-white p-8 shadow-2xl">
+              {/* Header */}
+              <div className="mb-6 flex items-center justify-between">
+                <div>
+                  <p
+                    className={`text-xs font-semibold uppercase tracking-[0.3em] mb-1 ${
+                      selectedTransactionToView.type === "Revenu" ? "text-emerald-500" : "text-red-500"
+                    }`}
+                  >
+                    {selectedTransactionToView.type === "Revenu" ? "Recette" : "Dépense"}
+                  </p>
+                  <h3 className="text-xl font-bold text-black">Détails de la transaction</h3>
                 </div>
-              )}
+                <button
+                  onClick={() => setIsViewModalOpen(false)}
+                  className="rounded-full p-2 text-black/50 transition hover:bg-zinc-100 hover:text-black"
+                >
+                  <CloseIcon />
+                </button>
+              </div>
+
+              {/* Montant en évidence */}
+              <div className={`mb-6 rounded-2xl p-6 text-center ${
+                selectedTransactionToView.type === "Revenu" 
+                  ? "bg-emerald-50 border-2 border-emerald-200" 
+                  : "bg-red-50 border-2 border-red-200"
+              }`}>
+                <p className="text-sm font-medium text-black/60 mb-2">Montant</p>
+                <p className={`text-3xl font-bold ${
+                  selectedTransactionToView.type === "Revenu" ? "text-emerald-600" : "text-red-600"
+                }`}>
+                  {selectedTransactionToView.montantAffiche}
+                </p>
+              </div>
+
+              {/* Informations principales */}
+              <div className="space-y-4 mb-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="rounded-xl bg-zinc-50 p-4">
+                    <p className="text-xs font-medium text-black/50 mb-1">Date</p>
+                    <p className="text-sm font-semibold text-black">{selectedTransactionToView.date}</p>
+                  </div>
+                  <div className="rounded-xl bg-zinc-50 p-4">
+                    <p className="text-xs font-medium text-black/50 mb-1">Compte</p>
+                    <p className="text-sm font-semibold text-black">{selectedTransactionToView.compte}</p>
+                  </div>
+                </div>
+
+                {description && (
+                  <div className="rounded-xl bg-zinc-50 p-4">
+                    <p className="text-xs font-medium text-black/50 mb-2">Description</p>
+                    <p className="text-sm font-semibold text-black">{description || "Aucune description"}</p>
+                  </div>
+                )}
+
+                <div className="rounded-xl bg-zinc-50 p-4">
+                  <p className="text-xs font-medium text-black/50 mb-2">Catégorie</p>
+                  <p className="text-sm font-semibold text-black">{selectedTransactionToView.categorie}</p>
+                </div>
+
+                {/* Sous-catégories */}
+                {sousCategorieArray.length > 0 && (
+                  <div className="rounded-xl bg-zinc-50 p-4">
+                    <p className="text-xs font-medium text-black/50 mb-2">Sous-catégorie(s)</p>
+                    <div className="flex flex-wrap gap-2">
+                      {sousCategorieArray.map((sc, index) => (
+                        <span
+                          key={index}
+                          className="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800 border border-blue-200"
+                        >
+                          {sc}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Informations supplémentaires */}
+                <div className="grid grid-cols-2 gap-4">
+                  {displayCheque && (
+                    <div className="rounded-xl bg-amber-50 border border-amber-200 p-4">
+                      <p className="text-xs font-medium text-amber-700 mb-1">Numéro de chèque</p>
+                      <p className="text-sm font-semibold text-amber-800">CHQ-{displayCheque}</p>
+                    </div>
+                  )}
+                  {numeroFacture && (
+                    <div className="rounded-xl bg-purple-50 border border-purple-200 p-4">
+                      <p className="text-xs font-medium text-purple-700 mb-1">Numéro de facture</p>
+                      <p className="text-sm font-semibold text-purple-800">{numeroFacture}</p>
+                    </div>
+                  )}
+                </div>
+
+              </div>
+
+              {/* Footer avec bouton de fermeture */}
+              <div className="flex justify-end pt-4 border-t border-black/10">
+                <button
+                  onClick={() => setIsViewModalOpen(false)}
+                  className="rounded-2xl bg-blue-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-600"
+                >
+                  Fermer
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       <ConfirmModal
         isOpen={isDeleteModalOpen}
