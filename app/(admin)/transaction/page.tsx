@@ -359,9 +359,13 @@ export default function TransactionsPage() {
     let sorted = [...transactions];
 
     if (!sortField) {
-      sorted.sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-      );
+      // Trier par date décroissante, puis par ID décroissant pour les transactions de même date
+      sorted.sort((a, b) => {
+        const dateDiff = new Date(b.date).getTime() - new Date(a.date).getTime();
+        if (dateDiff !== 0) return dateDiff;
+        // Si même date, trier par ID décroissant (plus récent en premier)
+        return parseInt(b.id) - parseInt(a.id);
+      });
       return sorted;
     }
 

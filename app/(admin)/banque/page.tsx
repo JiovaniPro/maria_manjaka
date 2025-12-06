@@ -579,8 +579,13 @@ export default function BanquePage() {
       );
     }
 
-    // Triez par date par défaut (la plus récente d'abord)
-    data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    // Triez par date décroissante, puis par ID décroissant pour les transactions de même date
+    data.sort((a, b) => {
+      const dateDiff = new Date(b.date).getTime() - new Date(a.date).getTime();
+      if (dateDiff !== 0) return dateDiff;
+      // Si même date, trier par ID décroissant (plus récent en premier)
+      return parseInt(b.id) - parseInt(a.id);
+    });
 
     return data;
   }, [activeTab, transactions, searchTerm, filterMonth, filterYear]);
