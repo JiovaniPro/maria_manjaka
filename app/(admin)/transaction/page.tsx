@@ -341,6 +341,19 @@ export default function TransactionsPage() {
     }));
   }, [defaultCaisseName]);
 
+  // Réinitialiser la catégorie si elle ne correspond plus au type de transaction
+  useEffect(() => {
+    if (formData.categorie) {
+      const selectedCategory = categoriesData.find(c => c.nom === formData.categorie);
+      if (selectedCategory && selectedCategory.type !== formData.type) {
+        setFormData(prev => ({
+          ...prev,
+          categorie: "", // Réinitialiser si le type ne correspond pas
+        }));
+      }
+    }
+  }, [formData.type, formData.categorie, categoriesData]);
+
   const getSortedTransactions = () => {
     let sorted = [...transactions];
 
@@ -538,13 +551,44 @@ export default function TransactionsPage() {
       return;
     }
 
-    if (formData.type === "Dépense" && isCaisseSelected && montantNumber > soldeCaisse) {
-      showToast("Montant supérieur au solde disponible en caisse.", "warning");
-      return;
+    // Vérification des soldes lors de la modification
+    // Si c'est une modification, on doit tenir compte de l'ancien montant qui sera remboursé
+    if (formData.type === "Dépense" && isCaisseSelected) {
+      let soldeEffectifCaisse = soldeCaisse;
+      
+      // Si c'est une modification d'une dépense, l'ancien montant sera remboursé à la caisse
+      if (selectedTransactionToModify && selectedTransactionToModify.type === "Dépense") {
+        const ancienMontant = Math.abs(parseFloat(selectedTransactionToModify.montant.toString()));
+        soldeEffectifCaisse = soldeCaisse + ancienMontant;
+      }
+      
+      if (montantNumber > soldeEffectifCaisse) {
+        showToast("Montant supérieur au solde disponible en caisse.", "warning");
+        return;
+      }
     }
 
-    if (formData.type === "Dépense" && isBanqueSelected && montantNumber > soldeBanque) {
-      showToast("Montant supérieur au solde disponible en banque.", "warning");
+    if (formData.type === "Dépense" && isBanqueSelected) {
+      let soldeEffectifBanque = soldeBanque;
+      
+      // Si c'est une modification d'une dépense bancaire, l'ancien montant sera remboursé à la banque
+      if (selectedTransactionToModify && selectedTransactionToModify.type === "Dépense") {
+        const ancienMontant = Math.abs(parseFloat(selectedTransactionToModify.montant.toString()));
+        soldeEffectifBanque = soldeBanque + ancienMontant;
+      }
+      
+      if (montantNumber > soldeEffectifBanque) {
+        showToast("Montant supérieur au solde disponible en banque.", "warning");
+        return;
+      }
+    }
+
+    // Vérifier que la catégorie sélectionnée est dans les catégories disponibles pour ce type
+    if (!formData.categorie || !availableCategories.some(c => c.nom === formData.categorie)) {
+      showToast(
+        `Veuillez sélectionner une catégorie valide pour une transaction de type "${formData.type}".`,
+        "error"
+      );
       return;
     }
 
@@ -556,6 +600,21 @@ export default function TransactionsPage() {
 
       if (!cat || !acc) {
         showToast("Catégorie ou compte invalide", "error");
+        return;
+      }
+
+      // Vérifier que le type de catégorie correspond au type de transaction
+      if (cat.type !== formData.type) {
+        showToast(
+          `Le type de catégorie (${cat.type}) ne correspond pas au type de transaction (${formData.type})`,
+          "error"
+        );
+        return;
+      }
+
+      // Vérifier que les IDs sont valides
+      if (!cat.id || !acc.id) {
+        showToast("Erreur: ID de catégorie ou compte invalide", "error");
         return;
       }
 
@@ -599,9 +658,20 @@ export default function TransactionsPage() {
         adminPasswordOverride: "",
       });
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erreur modification:", error);
-      showToast("Erreur lors de la modification", "error");
+      
+      // Extraire le message d'erreur du backend
+      const errorMessage = error?.response?.data?.message || 
+                          error?.message || 
+                          "Erreur lors de la modification de la transaction";
+      
+      showToast(errorMessage, "error");
+      
+      // Log détaillé pour le débogage
+      if (error?.response?.data) {
+        console.error("Détails de l'erreur backend:", error.response.data);
+      }
     }
   };
 
@@ -671,6 +741,15 @@ export default function TransactionsPage() {
       }
     }
 
+    // Vérifier que la catégorie sélectionnée est dans les catégories disponibles pour ce type
+    if (!formData.categorie || !availableCategories.some(c => c.nom === formData.categorie)) {
+      showToast(
+        `Veuillez sélectionner une catégorie valide pour une transaction de type "${formData.type}".`,
+        "error"
+      );
+      return;
+    }
+
     try {
       // Trouver les IDs correspondants aux noms
       const cat = categoriesData.find(c => c.nom === formData.categorie);
@@ -679,6 +758,21 @@ export default function TransactionsPage() {
 
       if (!cat || !acc) {
         showToast("Catégorie ou compte invalide", "error");
+        return;
+      }
+
+      // Vérifier que le type de catégorie correspond au type de transaction
+      if (cat.type !== formData.type) {
+        showToast(
+          `Le type de catégorie (${cat.type}) ne correspond pas au type de transaction (${formData.type})`,
+          "error"
+        );
+        return;
+      }
+
+      // Vérifier que les IDs sont valides
+      if (!cat.id || !acc.id) {
+        showToast("Erreur: ID de catégorie ou compte invalide", "error");
         return;
       }
 
@@ -739,9 +833,20 @@ export default function TransactionsPage() {
         adminPasswordOverride: "",
       });
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erreur ajout:", error);
-      showToast("Erreur lors de l'ajout", "error");
+      
+      // Extraire le message d'erreur du backend
+      const errorMessage = error?.response?.data?.message || 
+                          error?.message || 
+                          "Erreur lors de l'ajout de la transaction";
+      
+      showToast(errorMessage, "error");
+      
+      // Log détaillé pour le débogage
+      if (error?.response?.data) {
+        console.error("Détails de l'erreur backend:", error.response.data);
+      }
     }
   };
 
