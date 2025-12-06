@@ -504,6 +504,19 @@ export default function DashboardPage() {
     };
 
     fetchData();
+
+    // Écouter les événements de mise à jour des transactions
+    const handleTransactionUpdate = () => {
+      fetchData();
+    };
+
+    window.addEventListener('transaction-updated', handleTransactionUpdate);
+    window.addEventListener('compte-updated', handleTransactionUpdate);
+
+    return () => {
+      window.removeEventListener('transaction-updated', handleTransactionUpdate);
+      window.removeEventListener('compte-updated', handleTransactionUpdate);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Exécuter une seule fois au montage du composant
 

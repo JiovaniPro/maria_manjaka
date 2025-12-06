@@ -9,6 +9,7 @@ import { useLoading } from "@/hooks/useLoading";
 import { TransactionForm } from "@/components/TransactionForm";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import api from "@/services/api";
+import { apiCache } from "@/lib/api/cache";
 import {
   SearchIcon,
   PlusIcon,
@@ -640,6 +641,17 @@ export default function TransactionsPage() {
         type: formData.type === 'Revenu' ? 'RECETTE' : 'DEPENSE'
       });
 
+      // Invalider le cache des comptes et transactions pour forcer le rafraîchissement
+      apiCache.invalidatePattern('GET_/api/comptes');
+      apiCache.invalidatePattern('GET_/api/transactions');
+      apiCache.invalidatePattern('GET_/api/transactions/stats');
+
+      // Déclencher un événement pour rafraîchir le dashboard
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('transaction-updated'));
+        window.dispatchEvent(new Event('compte-updated'));
+      }
+
       showToast("Transaction modifiée avec succès", "success");
       setIsModifyModalOpen(false);
       setSelectedTransactionToModify(null);
@@ -686,6 +698,18 @@ export default function TransactionsPage() {
     if (transactionToDelete) {
       try {
         await api.delete(`/transactions/${transactionToDelete}`);
+        
+        // Invalider le cache des comptes et transactions pour forcer le rafraîchissement
+        apiCache.invalidatePattern('GET_/api/comptes');
+        apiCache.invalidatePattern('GET_/api/transactions');
+        apiCache.invalidatePattern('GET_/api/transactions/stats');
+
+        // Déclencher un événement pour rafraîchir le dashboard
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('transaction-updated'));
+          window.dispatchEvent(new Event('compte-updated'));
+        }
+
         showToast(`Transaction supprimée.`, "success"); // Changed to success type
         setIsDeleteModalOpen(false);
         setTransactionToDelete(null);
@@ -799,6 +823,15 @@ export default function TransactionsPage() {
           type: 'RETRAIT',
           numeroCheque: formData.numeroCheque
         });
+        
+        // Invalider le cache des comptes après transaction bancaire
+        apiCache.invalidatePattern('GET_/api/comptes');
+        apiCache.invalidatePattern('GET_/api/transactions-bancaires');
+        
+        // Déclencher un événement pour rafraîchir le dashboard
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('compte-updated'));
+        }
       }
 
       // Pour une dépense réglée par la banque, on crée d'abord la transaction bancaire (débit banque / crédit caisse)
@@ -815,6 +848,17 @@ export default function TransactionsPage() {
         montant: parseFloat(formData.montant.toString().replace(/\s/g, '')),
         type: formData.type === 'Revenu' ? 'RECETTE' : 'DEPENSE'
       });
+
+      // Invalider le cache des comptes et transactions pour forcer le rafraîchissement
+      apiCache.invalidatePattern('GET_/api/comptes');
+      apiCache.invalidatePattern('GET_/api/transactions');
+      apiCache.invalidatePattern('GET_/api/transactions/stats');
+
+      // Déclencher un événement pour rafraîchir le dashboard
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('transaction-updated'));
+        window.dispatchEvent(new Event('compte-updated'));
+      }
 
       showToast("Transaction ajoutée avec succès", "success");
       setIsAddModalOpen(false);

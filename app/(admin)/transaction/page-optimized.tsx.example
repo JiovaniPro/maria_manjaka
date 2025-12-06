@@ -1,0 +1,56 @@
+/**
+ * EXEMPLE D'OPTIMISATION - Page Transaction
+ * 
+ * Ce fichier montre comment utiliser le nouveau système optimisé
+ * pour éviter les appels API multiples
+ */
+
+import { useApi, useStaticData } from '@/hooks/useApi';
+import { api } from '@/lib/api/apiClient';
+
+export default function TransactionsPageOptimized() {
+  // ✅ Utiliser useStaticData pour les données qui changent rarement
+  const { 
+    data: categories, 
+    loading: categoriesLoading 
+  } = useStaticData('categories', () => 
+    api.get('/categories')
+  );
+
+  const { 
+    data: accounts, 
+    loading: accountsLoading 
+  } = useStaticData('comptes', () => 
+    api.get('/comptes')
+  );
+
+  // ✅ Utiliser useApi pour les données dynamiques
+  const { 
+    data: transactions, 
+    loading: transactionsLoading,
+    refetch: refetchTransactions 
+  } = useApi({
+    key: 'transactions',
+    fetchFn: () => api.get('/transactions?limit=100'),
+    ttl: 1 * 60 * 1000, // 1 minute
+    refetchOnMount: true,
+  });
+
+  // ✅ Les données sont automatiquement mises en cache
+  // ✅ Pas de double appel même avec React Strict Mode
+  // ✅ Verrous pour éviter les appels simultanés
+
+  if (categoriesLoading || accountsLoading || transactionsLoading) {
+    return <div>Chargement...</div>;
+  }
+
+  return (
+    <div>
+      {/* Votre UI ici */}
+      <button onClick={refetchTransactions}>
+        Actualiser
+      </button>
+    </div>
+  );
+}
+
