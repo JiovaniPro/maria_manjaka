@@ -36,6 +36,11 @@ type BankTransaction = {
   compteId?: number;
 };
 
+// Type pour le formulaire qui permet montant comme string ou number
+type BankTransactionFormData = Omit<BankTransaction, 'montant'> & {
+  montant: string | number;
+};
+
 type BankAccount = {
   id: number;
   nom: string;
@@ -206,8 +211,8 @@ interface ModalFormProps {
   title: string;
   onSubmit: (e: React.FormEvent) => void;
   onClose: () => void;
-  formData: Partial<BankTransaction>;
-  setFormData: React.Dispatch<React.SetStateAction<Partial<BankTransaction>>>;
+  formData: Partial<BankTransactionFormData>;
+  setFormData: React.Dispatch<React.SetStateAction<Partial<BankTransactionFormData>>>;
   isRetrait: boolean;
   isModification: boolean;
   showToast: (message: string, type: 'success' | 'error' | 'warning' | 'info') => void;
@@ -357,14 +362,14 @@ export default function BanquePage() {
   const [selectedItem, setSelectedItem] = useState<BankTransaction | null>(null);
 
   // Form State
-  const initialFormData: Partial<BankTransaction> = {
+  const initialFormData: Partial<BankTransactionFormData> = {
     date: new Date().toISOString().substring(0, 10),
     description: "",
     montant: 0,
     numeroCheque: "",
     type: "Retrait" // Temporaire, sera mis à jour
   };
-  const [formData, setFormData] = useState<Partial<BankTransaction>>(initialFormData);
+  const [formData, setFormData] = useState<Partial<BankTransactionFormData>>(initialFormData);
 
   // --- Fetch Data ---
   const fetchData = async () => {
@@ -443,6 +448,25 @@ export default function BanquePage() {
   };
 
   // --- Logic for Modification ---
+  
+  // Fonction pour extraire la description propre et le numéro de chèque si présent dans la description
+  const extractDescriptionParts = (fullDescription: string) => {
+    let description = fullDescription || "";
+
+    // Extraire le numéro de chèque depuis "(CHQ-XXX)" si présent dans la description
+    const chequeMatch = description.match(/\(CHQ-([\w-]+)\)/);
+    let numeroChequeFromDesc = "";
+    if (chequeMatch) {
+      numeroChequeFromDesc = chequeMatch[1].trim();
+      description = description.replace(/\(CHQ-[\w-]+\)/g, "").trim();
+    }
+
+    // Nettoyer les espaces multiples et les espaces en début/fin
+    description = description.replace(/\s+/g, " ").trim();
+
+    return { description, numeroChequeFromDesc };
+  };
+
   const startModify = (item: BankTransaction) => {
     setSelectedItem(item);
     setAuthPassword("");
@@ -453,11 +477,20 @@ export default function BanquePage() {
     e.preventDefault();
     if (authPassword === adminPassword) {
       setIsAuthModalOpen(false);
+      
+      // Extraire les parties de la description si nécessaire
+      const { description, numeroChequeFromDesc } = extractDescriptionParts(
+        selectedItem?.description || ""
+      );
+
       setFormData({
         ...selectedItem,
+        description: description,
         montant: Math.abs(selectedItem?.montant || 0),
-        type: selectedItem?.type
-      } as Partial<BankTransaction>);
+        type: selectedItem?.type,
+        // Utiliser le numéro de chèque extrait de la description s'il n'y en a pas déjà un dans le champ séparé
+        numeroCheque: selectedItem?.numeroCheque || numeroChequeFromDesc || ""
+      } as Partial<BankTransactionFormData>);
       setIsModifyModalOpen(true);
       showToast("Accès autorisé", "success");
     } else {

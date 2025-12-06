@@ -560,6 +560,32 @@ export default function TransactionsPage() {
 
   // --- Security & Modify Logic
 
+  // Fonction pour extraire la description, le numéro de facture et le numéro de chèque
+  const extractDescriptionParts = (fullDescription: string) => {
+    let description = fullDescription || "";
+    let numeroFacture = "";
+    let numeroCheque = "";
+
+    // Extraire le numéro de facture depuis "(Facture: XXX)"
+    const factureMatch = description.match(/\(Facture:\s*([^)]+)\)/);
+    if (factureMatch) {
+      numeroFacture = factureMatch[1].trim();
+      description = description.replace(/\(Facture:\s*[^)]+\)/g, "").trim();
+    }
+
+    // Extraire le numéro de chèque depuis "(CHQ-XXX)"
+    const chequeMatch = description.match(/\(CHQ-([\w-]+)\)/);
+    if (chequeMatch) {
+      numeroCheque = chequeMatch[1].trim();
+      description = description.replace(/\(CHQ-[\w-]+\)/g, "").trim();
+    }
+
+    // Nettoyer les espaces multiples et les espaces en début/fin
+    description = description.replace(/\s+/g, " ").trim();
+
+    return { description, numeroFacture, numeroCheque };
+  };
+
   const startView = (transaction: Transaction) => {
     setSelectedTransactionToView(transaction);
     setIsViewModalOpen(true);
@@ -584,17 +610,23 @@ export default function TransactionsPage() {
         const montantAbsolu = Math.abs(
           selectedTransactionToModify.montant
         ).toString();
+        
+        // Extraire les parties de la description
+        const { description, numeroFacture, numeroCheque } = extractDescriptionParts(
+          selectedTransactionToModify.description
+        );
+
         setFormData({
           id: selectedTransactionToModify.id,
           date: selectedTransactionToModify.date,
-          description: selectedTransactionToModify.description,
+          description: description,
           montant: montantAbsolu,
           type: selectedTransactionToModify.type,
           categorie: selectedTransactionToModify.categorie,
           sousCategorie: selectedTransactionToModify.sousCategorieId?.toString() || "",
           compte: selectedTransactionToModify.compte,
-          numeroCheque: selectedTransactionToModify.numeroCheque || "",
-          numeroFacture: "",
+          numeroCheque: numeroCheque || selectedTransactionToModify.numeroCheque || "",
+          numeroFacture: numeroFacture,
           adminPasswordOverride: "",
         });
         setIsModifyModalOpen(true);
@@ -740,6 +772,7 @@ export default function TransactionsPage() {
         montant: "",
         type: "Revenu",
         categorie: "",
+        sousCategorie: "",
         compte: "",
         numeroCheque: "",
         numeroFacture: "",
@@ -954,6 +987,7 @@ export default function TransactionsPage() {
         montant: "",
         type: "Revenu",
         categorie: "",
+        sousCategorie: "",
         compte: defaultCaisseName,
         numeroCheque: "",
         numeroFacture: "",
