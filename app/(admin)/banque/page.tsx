@@ -590,14 +590,28 @@ export default function BanquePage() {
     }
 
     try {
-      const payload = {
+      // Vérifier que la date est définie
+      if (!formData.date) {
+        showToast("La date est obligatoire.", "error");
+        return;
+      }
+
+      const payload: any = {
         compteId: bankAccount.id,
         dateOperation: formData.date,
-        description: formData.description || "Nouvelle transaction",
+        description: formData.description || "",
         montant: montant,
         type: type === "Retrait" ? "RETRAIT" : "DEPOT",
-        numeroCheque: type === "Retrait" ? formData.numeroCheque : undefined
       };
+
+      // Ajouter le numéro de chèque seulement pour les retraits et s'il est défini
+      if (type === "Retrait") {
+        if (!formData.numeroCheque || formData.numeroCheque.trim() === "") {
+          showToast("Le N° Chèque est obligatoire pour un Retrait.", "error");
+          return;
+        }
+        payload.numeroCheque = formData.numeroCheque.trim();
+      }
 
       await api.post('/transactions-bancaires', payload);
 
