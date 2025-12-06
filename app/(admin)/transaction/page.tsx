@@ -40,6 +40,7 @@ type Transaction = {
   montantAffiche?: string;
   type: "Revenu" | "Dépense";
   categorie: string;
+  sousCategorie?: string;
   compte: string;
   numeroCheque?: string;
   categorieId?: number; // Pour l'API
@@ -262,6 +263,7 @@ export default function TransactionsPage() {
           montantAffiche: t.type === 'RECETTE' ? `+${formatCurrency(t.montant)}` : `-${formatCurrency(t.montant)}`,
           type: t.type === 'RECETTE' ? 'Revenu' : 'Dépense',
           categorie: t.categorie?.nom || 'Inconnue',
+          sousCategorie: t.sousCategorie?.nom || '',
           compte: isBankPaidExpense ? banque!.nom : (t.compte?.nom || 'Inconnu'),
           numeroCheque: t.numeroCheque || (chequeMatch ? chequeMatch[1] : undefined),
           categorieId: t.categorieId,
@@ -1082,7 +1084,10 @@ export default function TransactionsPage() {
               <TagIcon />
               <select
                 value={filterSousCategorie}
-                onChange={(e) => setFilterSousCategorie(e.target.value)}
+                onChange={(e) => {
+                  setFilterSousCategorie(e.target.value);
+                  setCurrentPage(1);
+                }}
                 className="cursor-pointer bg-transparent text-sm outline-none"
               >
                 <option value="">Toutes les sous-catégories</option>
@@ -1184,6 +1189,7 @@ export default function TransactionsPage() {
                   </div>
                 </th>
                 <th className="px-6 py-4 font-semibold">Catégorie</th>
+                <th className="px-6 py-4 font-semibold">Sous-catégorie</th>
                 <th className="px-6 py-4 font-semibold">Type</th>
                 <th className="px-6 py-4 font-semibold">Compte</th>
                 <th
@@ -1217,6 +1223,15 @@ export default function TransactionsPage() {
                       <span className="inline-flex items-center rounded-full border border-black/5 bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-black/70">
                         {t.categorie}
                       </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      {t.sousCategorie ? (
+                        <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
+                          {t.sousCategorie}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-black/40 italic">-</span>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <span
@@ -1266,7 +1281,7 @@ export default function TransactionsPage() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center">
+                  <td colSpan={8} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center justify-center text-black/40">
                       <SearchIcon />
                       <p className="mt-2 text-sm">

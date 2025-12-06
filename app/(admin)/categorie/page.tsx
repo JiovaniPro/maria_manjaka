@@ -524,13 +524,6 @@ export default function CategoriesPage() {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => handleOpenAddSousCategorieModal(category)}
-                        className="rounded-lg p-2 text-black/60 transition hover:bg-blue-50 hover:text-blue-600"
-                        title="Ajouter une sous-catégorie"
-                      >
-                        <PlusIcon />
-                      </button>
-                      <button
                         onClick={() => handleViewSousCategories(category)}
                         className="rounded-lg p-2 text-black/60 transition hover:bg-green-50 hover:text-green-600"
                         title="Voir les sous-catégories"
@@ -606,7 +599,7 @@ export default function CategoriesPage() {
 
       {/* Modal d'ajout/modification de sous-catégorie */}
       {isSousCategorieModalOpen && selectedCategoryForSousCategorie && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-3xl border border-black/10 bg-white p-8 shadow-2xl">
             <div className="mb-6 flex items-center justify-between">
               <h2 className="text-xl font-bold">
@@ -668,7 +661,7 @@ export default function CategoriesPage() {
 
       {/* Modal de visualisation des sous-catégories */}
       {isViewSousCategoriesModalOpen && selectedCategoryForSousCategorie && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-2xl rounded-3xl border border-black/10 bg-white p-8 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="mb-6 flex items-center justify-between">
               <h2 className="text-xl font-bold">

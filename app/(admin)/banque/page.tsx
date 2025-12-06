@@ -6,6 +6,7 @@ import { useToast } from "@/components/ToastContainer";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { useLoading } from "@/hooks/useLoading";
 import api from "@/services/api"; // Import API
+import { apiCache } from "@/lib/api/cache";
 import {
   SearchIcon,
   PlusIcon,
@@ -486,6 +487,14 @@ export default function BanquePage() {
 
         await api.put(`/transactions-bancaires/${formData.id}`, payload);
 
+        // Invalider le cache des comptes pour forcer le rafraîchissement
+        apiCache.invalidatePattern('GET_/api/comptes');
+        apiCache.invalidatePattern('GET_/api/transactions-bancaires');
+        // Déclencher un événement pour rafraîchir le dashboard
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('compte-updated'));
+        }
+
         showToast("Modification enregistrée", "success");
         setIsModifyModalOpen(false);
         setDataVersion(v => v + 1); // Déclencheur de rafraîchissement
@@ -540,6 +549,14 @@ export default function BanquePage() {
       };
 
       await api.post('/transactions-bancaires', payload);
+
+      // Invalider le cache des comptes pour forcer le rafraîchissement
+      apiCache.invalidatePattern('GET_/api/comptes');
+      apiCache.invalidatePattern('GET_/api/transactions-bancaires');
+      // Déclencher un événement pour rafraîchir le dashboard
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('compte-updated'));
+      }
 
       showToast(`${type} ajouté avec succès.`, "success");
       setIsAddModalOpen(false);
