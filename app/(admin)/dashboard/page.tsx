@@ -44,6 +44,8 @@ type TrendData = {
 // ====================================================================
 
 import { useAdminPassword } from "@/hooks/useAdminPassword";
+import { useSecurityLock } from "@/hooks/useSecurityLock";
+import { SecurityLockModal } from "@/components/SecurityLockModal";
 
 function SecureAccountCard({
   account,
@@ -53,6 +55,7 @@ function SecureAccountCard({
   showToast: (msg: string, type: "success" | "error" | "warning") => void;
 }) {
   const { adminPassword } = useAdminPassword();
+  const { recordFailedAttempt, resetFailedAttempts, remainingAttempts } = useSecurityLock();
   const [showSolde, setShowSolde] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [password, setPassword] = useState("");
@@ -88,12 +91,19 @@ function SecureAccountCard({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (password === adminPassword) {
+      resetFailedAttempts();
       setShowSolde(true);
       setIsAuthModalOpen(false);
       setPassword("");
       showToast("Solde affiché.", "success");
     } else {
-      showToast("Mot de passe incorrect.", "error");
+      recordFailedAttempt();
+      // Calculer les tentatives restantes après l'enregistrement (on soustrait 1 car recordFailedAttempt vient d'être appelé)
+      const attemptsAfter = remainingAttempts - 1;
+      const message = attemptsAfter > 0 
+        ? `Mot de passe incorrect. Tentatives restantes : ${attemptsAfter}`
+        : "Mot de passe incorrect. Application bloquée.";
+      showToast(message, "error");
       setPassword("");
     }
   };
@@ -167,6 +177,7 @@ function SecureFinancialCard({
   showToast: (msg: string, type: "success" | "error" | "warning") => void;
 }) {
   const { adminPassword } = useAdminPassword();
+  const { recordFailedAttempt, resetFailedAttempts, remainingAttempts } = useSecurityLock();
   const [showSolde, setShowSolde] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [password, setPassword] = useState("");
@@ -202,12 +213,19 @@ function SecureFinancialCard({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (password === adminPassword) {
+      resetFailedAttempts();
       setShowSolde(true);
       setIsAuthModalOpen(false);
       setPassword("");
       showToast("Solde affiché.", "success");
     } else {
-      showToast("Mot de passe incorrect.", "error");
+      recordFailedAttempt();
+      // Calculer les tentatives restantes après l'enregistrement (on soustrait 1 car recordFailedAttempt vient d'être appelé)
+      const attemptsAfter = remainingAttempts - 1;
+      const message = attemptsAfter > 0 
+        ? `Mot de passe incorrect. Tentatives restantes : ${attemptsAfter}`
+        : "Mot de passe incorrect. Application bloquée.";
+      showToast(message, "error");
       setPassword("");
     }
   };
@@ -686,6 +704,7 @@ export default function DashboardPage() {
           </article>
         </div>
       </section>
+      <SecurityLockModal />
     </div>
   );
 }

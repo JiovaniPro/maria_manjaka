@@ -8,6 +8,8 @@ import { LoadingScreen } from "@/components/LoadingScreen";
 import { useLoading } from "@/hooks/useLoading";
 import { TransactionForm } from "@/components/TransactionForm";
 import { ConfirmModal } from "@/components/ConfirmModal";
+import { SecurityLockModal } from "@/components/SecurityLockModal";
+import { useSecurityLock } from "@/hooks/useSecurityLock";
 import api from "@/services/api";
 import { apiCache } from "@/lib/api/cache";
 import {
@@ -143,6 +145,7 @@ export default function TransactionsPage() {
   const { showToast } = useToast();
   const isLoading = useLoading(1200);
   const { adminPassword } = useAdminPassword();
+  const { isLocked, recordFailedAttempt, resetFailedAttempts, remainingAttempts } = useSecurityLock();
 
   // --- VARIABLES D'ÉTAT POUR L'API
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -600,6 +603,7 @@ export default function TransactionsPage() {
   const handleAuthSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (authPassword === adminPassword) {
+      resetFailedAttempts();
       showToast(
         "Mot de passe correct. Ouverture du modal de modification.",
         "success"
@@ -632,7 +636,13 @@ export default function TransactionsPage() {
         setIsModifyModalOpen(true);
       }
     } else {
-      showToast("Mot de passe incorrect.", "error");
+      recordFailedAttempt();
+      // Calculer les tentatives restantes après l'enregistrement (on soustrait 1 car recordFailedAttempt vient d'être appelé)
+      const attemptsAfter = remainingAttempts - 1;
+      const message = attemptsAfter > 0 
+        ? `Mot de passe incorrect. Tentatives restantes : ${attemptsAfter}`
+        : "Mot de passe incorrect. Application bloquée.";
+      showToast(message, "error");
       setAuthPassword("");
     }
   };
@@ -1523,6 +1533,8 @@ export default function TransactionsPage() {
         confirmText="Supprimer"
         type="danger"
       />
+
+      <SecurityLockModal />
     </div>
   );
 }

@@ -5,6 +5,8 @@ import { useRouter, usePathname } from "next/navigation";
 import { useToast } from "@/components/ToastContainer";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { useLoading } from "@/hooks/useLoading";
+import { SecurityLockModal } from "@/components/SecurityLockModal";
+import { useSecurityLock } from "@/hooks/useSecurityLock";
 import api from "@/services/api"; // Import API
 import { apiCache } from "@/lib/api/cache";
 import {
@@ -81,6 +83,7 @@ function EyeOffIcon() { return <svg viewBox="0 0 24 24" className="h-5 w-5" fill
 
 function SecureSoldeCard({ soldeActuel, showToast }: { soldeActuel: number, showToast: (message: string, type: 'success' | 'error' | 'warning' | 'info') => void }) {
   const { adminPassword } = useAdminPassword();
+  const { recordFailedAttempt, resetFailedAttempts, remainingAttempts } = useSecurityLock();
   const [showSolde, setShowSolde] = useState(false);
   const [soldeAuthModalOpen, setSoldeAuthModalOpen] = useState(false);
   const [soldeAuthPassword, setSoldeAuthPassword] = useState("");
@@ -120,12 +123,19 @@ function SecureSoldeCard({ soldeActuel, showToast }: { soldeActuel: number, show
   const handleSoldeAuth = (e: React.FormEvent) => {
     e.preventDefault();
     if (soldeAuthPassword === adminPassword) {
+      resetFailedAttempts();
       setShowSolde(true);
       setSoldeAuthModalOpen(false);
       setSoldeAuthPassword("");
       showToast("Solde affiché.", "success");
     } else {
-      showToast("Code de sécurité incorrect.", "error");
+      recordFailedAttempt();
+      // Calculer les tentatives restantes après l'enregistrement (on soustrait 1 car recordFailedAttempt vient d'être appelé)
+      const attemptsAfter = remainingAttempts - 1;
+      const message = attemptsAfter > 0 
+        ? `Code de sécurité incorrect. Tentatives restantes : ${attemptsAfter}`
+        : "Code de sécurité incorrect. Application bloquée.";
+      showToast(message, "error");
       setSoldeAuthPassword("");
     }
   };
@@ -334,6 +344,7 @@ export default function BanquePage() {
   const router = useRouter();
   const { showToast } = useToast(); // UTILISATION DU HOOK useToast
   const { adminPassword } = useAdminPassword();
+  const { recordFailedAttempt, resetFailedAttempts, remainingAttempts } = useSecurityLock();
 
   const isLoading = useLoading(1000);
 
@@ -476,6 +487,7 @@ export default function BanquePage() {
   const verifyPassword = (e: React.FormEvent) => {
     e.preventDefault();
     if (authPassword === adminPassword) {
+      resetFailedAttempts();
       setIsAuthModalOpen(false);
       
       // Extraire les parties de la description si nécessaire
@@ -494,7 +506,13 @@ export default function BanquePage() {
       setIsModifyModalOpen(true);
       showToast("Accès autorisé", "success");
     } else {
-      showToast("Code incorrect", "error");
+      recordFailedAttempt();
+      // Calculer les tentatives restantes après l'enregistrement (on soustrait 1 car recordFailedAttempt vient d'être appelé)
+      const attemptsAfter = remainingAttempts - 1;
+      const message = attemptsAfter > 0 
+        ? `Code incorrect. Tentatives restantes : ${attemptsAfter}`
+        : "Code incorrect. Application bloquée.";
+      showToast(message, "error");
     }
   };
 
@@ -885,6 +903,7 @@ export default function BanquePage() {
         </div>
       )}
 
+      <SecurityLockModal />
     </div>
   );
 }
