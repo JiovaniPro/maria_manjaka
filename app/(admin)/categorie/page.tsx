@@ -372,6 +372,12 @@ export default function CategoriesPage() {
         });
         showToast("Sous-catégorie créée avec succès", "success");
       }
+      
+      // Déclencher un événement pour rafraîchir la page association
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('sous-categorie-updated'));
+      }
+      
       handleCloseSousCategorieModal();
       if (isViewSousCategoriesModalOpen) {
         handleViewSousCategories(selectedCategoryForSousCategorie);

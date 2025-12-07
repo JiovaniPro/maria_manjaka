@@ -369,19 +369,20 @@ export default function TransactionsPage() {
           if (selectedCat) {
             const response = await api.get(`/sous-categories?categorieId=${selectedCat.id}&statut=ACTIF`);
             setSousCategoriesData(response.data.data || []);
-            // Ne réinitialiser les sous-catégories que si :
-            // 1. Elles sont vides ET
-            // 2. On n'est pas en mode modification (pas d'ID de transaction)
+            // Réinitialiser les sous-catégories quand on change de catégorie
+            // Sauf si on est en mode modification ET que la catégorie n'a pas changé
             setFormData(prev => {
-              // Si on est en mode modification (formData.id existe), ne pas réinitialiser les sous-catégories
+              // Si on est en mode modification, vérifier si la catégorie a changé
               if (prev.id) {
+                // Si la catégorie a changé, réinitialiser les sous-catégories
+                const previousCat = categoriesData.find(c => c.nom === prev.categorie);
+                if (previousCat && previousCat.id !== selectedCat.id) {
+                  return { ...prev, sousCategorie: [] };
+                }
+                // Sinon, garder les sous-catégories existantes
                 return prev;
               }
-              // Si on a déjà des sous-catégories sélectionnées, on les garde
-              if (prev.sousCategorie && prev.sousCategorie.length > 0) {
-                return prev;
-              }
-              // Sinon, on réinitialise (cas de la création ou changement de catégorie)
+              // En mode création, toujours réinitialiser quand on change de catégorie
               return { ...prev, sousCategorie: [] };
             });
           } else {
@@ -490,6 +491,7 @@ export default function TransactionsPage() {
       ...formData,
       type: newType,
       categorie: "", // Reset categorie on type change
+      sousCategorie: [], // Réinitialiser aussi les sous-catégories
       compte: newType === "Revenu" ? defaultCaisseName : defaultCaisseName, // dépense pourra changer ensuite
       numeroCheque: "",
       numeroFacture: "",
@@ -506,14 +508,22 @@ export default function TransactionsPage() {
   }, [defaultCaisseName]);
 
   // Réinitialiser la catégorie si elle ne correspond plus au type de transaction
+  // Exception : Ne pas réinitialiser Fikambanana automatiquement, laisser l'utilisateur choisir
+  // La validation se fera lors de la soumission
   useEffect(() => {
     if (formData.categorie) {
       const selectedCategory = categoriesData.find(c => c.nom === formData.categorie);
-      if (selectedCategory && selectedCategory.type !== formData.type) {
-        setFormData(prev => ({
-          ...prev,
-          categorie: "", // Réinitialiser si le type ne correspond pas
-        }));
+      if (selectedCategory) {
+        const isFikambanana = selectedCategory.nom.toLowerCase().includes("fikambanana");
+        // Ne pas réinitialiser Fikambanana automatiquement
+        // Pour les autres catégories, réinitialiser si le type ne correspond pas
+        if (!isFikambanana && selectedCategory.type !== formData.type) {
+          setFormData(prev => ({
+            ...prev,
+            categorie: "", // Réinitialiser si le type ne correspond pas
+            sousCategorie: [], // Réinitialiser aussi les sous-catégories
+          }));
+        }
       }
     }
   }, [formData.type, formData.categorie, categoriesData]);
@@ -618,9 +628,33 @@ export default function TransactionsPage() {
     startIndex + itemsPerPage
   );
 
-  const availableCategories = categoriesData.filter(
-    (cat) => cat.type === formData.type && cat.statut === "actif"
-  );
+  const availableCategories = useMemo(() => {
+    const filtered = categoriesData.filter(
+      (cat) => {
+        if (cat.statut !== "actif") return false;
+        
+        // Pour Fikambanana, afficher toutes les catégories Fikambanana (peu importe le type)
+        // car il peut y avoir deux catégories distinctes (une pour RECETTE, une pour DEPENSE)
+        const isFikambanana = cat.nom.toLowerCase().includes("fikambanana");
+        if (isFikambanana) {
+          return true;
+        }
+        
+        // Pour les autres catégories, vérifier que le type correspond
+        return cat.type === formData.type;
+      }
+    );
+    // Éviter les doublons en utilisant un Set basé sur l'ID (pas le nom, car Fikambanana peut avoir plusieurs catégories avec des noms similaires)
+    const seenById = new Set<string>();
+    return filtered.filter(cat => {
+      // Vérifier par ID uniquement pour éviter les vraies doublons
+      if (seenById.has(cat.id)) {
+        return false;
+      }
+      seenById.add(cat.id);
+      return true;
+    });
+  }, [categoriesData, formData.type]);
 
   const montantNumber = parseFloat(formData.montant.toString().replace(/\s/g, '')) || 0;
   const isCaisseDisabled =
@@ -826,9 +860,11 @@ export default function TransactionsPage() {
       }
 
       // Vérifier que le type de catégorie correspond au type de transaction
+      // Même pour Fikambanana, il y a deux catégories distinctes (une pour RECETTE, une pour DEPENSE)
+      // Le type de catégorie doit donc correspondre au type de transaction
       if (cat.type !== formData.type) {
         showToast(
-          `Le type de catégorie (${cat.type}) ne correspond pas au type de transaction (${formData.type})`,
+          `Le type de catégorie (${cat.type}) ne correspond pas au type de transaction (${formData.type}). Veuillez sélectionner la catégorie appropriée.`,
           "error"
         );
         return;
@@ -865,9 +901,24 @@ export default function TransactionsPage() {
         return;
       }
 
-      // Pour l'API, on prend la première sous-catégorie sélectionnée (l'API ne supporte qu'une seule)
-      const firstSousCategorieId = sousCategorieArray[0];
+      // Vérifier que la sous-catégorie appartient bien à la catégorie sélectionnée
+      const firstSousCategorieId = parseInt(sousCategorieArray[0]);
+      const selectedSousCategorie = sousCategoriesData.find(sc => sc.id === firstSousCategorieId);
       
+      if (!selectedSousCategorie) {
+        showToast("Sous-catégorie invalide", "error");
+        return;
+      }
+      
+      // Vérifier que la sous-catégorie appartient bien à la catégorie sélectionnée
+      if (selectedSousCategorie.categorieId !== parseInt(cat.id)) {
+        showToast(
+          "La sous-catégorie sélectionnée n'appartient pas à la catégorie sélectionnée",
+          "error"
+        );
+        return;
+      }
+
       // Stocker toutes les sous-catégories sélectionnées dans la description pour pouvoir les récupérer plus tard
       const sousCategoriesIds = sousCategorieArray.join(',');
       const descriptionWithSousCategories = sousCategorieArray.length > 1
@@ -876,7 +927,7 @@ export default function TransactionsPage() {
 
       await api.put(`/transactions/${formData.id}`, {
         categorieId: parseInt(cat.id),
-        sousCategorieId: parseInt(firstSousCategorieId),
+        sousCategorieId: firstSousCategorieId,
         compteId: acc.id,
         dateTransaction: formData.date,
         description: descriptionWithSousCategories || null,
@@ -1030,9 +1081,11 @@ export default function TransactionsPage() {
       }
 
       // Vérifier que le type de catégorie correspond au type de transaction
+      // Même pour Fikambanana, il y a deux catégories distinctes (une pour RECETTE, une pour DEPENSE)
+      // Le type de catégorie doit donc correspondre au type de transaction
       if (cat.type !== formData.type) {
         showToast(
-          `Le type de catégorie (${cat.type}) ne correspond pas au type de transaction (${formData.type})`,
+          `Le type de catégorie (${cat.type}) ne correspond pas au type de transaction (${formData.type}). Veuillez sélectionner la catégorie appropriée.`,
           "error"
         );
         return;
@@ -1096,9 +1149,24 @@ export default function TransactionsPage() {
         return;
       }
 
-      // Pour l'API, on prend la première sous-catégorie sélectionnée (l'API ne supporte qu'une seule)
-      const firstSousCategorieId = sousCategorieArray[0];
+      // Vérifier que la sous-catégorie appartient bien à la catégorie sélectionnée
+      const firstSousCategorieId = parseInt(sousCategorieArray[0]);
+      const selectedSousCategorie = sousCategoriesData.find(sc => sc.id === firstSousCategorieId);
       
+      if (!selectedSousCategorie) {
+        showToast("Sous-catégorie invalide", "error");
+        return;
+      }
+      
+      // Vérifier que la sous-catégorie appartient bien à la catégorie sélectionnée
+      if (selectedSousCategorie.categorieId !== parseInt(cat.id)) {
+        showToast(
+          "La sous-catégorie sélectionnée n'appartient pas à la catégorie sélectionnée",
+          "error"
+        );
+        return;
+      }
+
       // Stocker toutes les sous-catégories sélectionnées dans la description pour pouvoir les récupérer plus tard
       const sousCategoriesIds = sousCategorieArray.join(',');
       const descriptionWithSousCategories = sousCategorieArray.length > 1
@@ -1107,7 +1175,7 @@ export default function TransactionsPage() {
 
       await api.post('/transactions', {
         categorieId: parseInt(cat.id),
-        sousCategorieId: parseInt(firstSousCategorieId),
+        sousCategorieId: firstSousCategorieId,
         compteId: targetCompteId,
         dateTransaction: formData.date,
         description: descriptionWithSousCategories || null,
