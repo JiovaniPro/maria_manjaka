@@ -36,6 +36,7 @@ export type Compte = {
 export type Transaction = {
     id: number;
     categorieId: number;
+    sousCategorieId?: number;
     compteId: number;
     dateTransaction: string;
     description: string;
@@ -46,6 +47,12 @@ export type Transaction = {
     updatedAt?: string;
     // Relations incluses
     categorie?: Categorie;
+    sousCategorie?: {
+        id: number;
+        nom: string;
+        categorieId: number;
+        statut: 'ACTIF' | 'INACTIF';
+    };
     compte?: Compte;
     user?: {
         nom: string;
