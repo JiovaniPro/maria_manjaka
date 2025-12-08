@@ -370,14 +370,16 @@ export default function DashboardPage() {
         );
         const recettesData = recettesResponse.data.data || [];
 
-        // 5. Récupérer les transactions des 7 derniers mois pour le graphique des tendances
-        // OPTIMISATION: 2 requêtes globales au lieu de 14 (7 mois × 2 types)
-        const startDate7Months = new Date(currentDate.getFullYear(), currentDate.getMonth() - 6, 1);
-        const endDate7Months = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-        const globalStart = startDate7Months.toISOString();
-        const globalEnd = endDate7Months.toISOString();
+        // 5. Récupérer les transactions pour une fenêtre dynamique :
+        //    - 2 mois avant le mois courant
+        //    - mois courant
+        //    - 3 mois après le mois courant
+        const startDateWindow = new Date(currentDate.getFullYear(), currentDate.getMonth() - 2, 1);
+        const endDateWindow = new Date(currentDate.getFullYear(), currentDate.getMonth() + 4, 0);
+        const globalStart = startDateWindow.toISOString();
+        const globalEnd = endDateWindow.toISOString();
         
-        // 2 requêtes globales pour toutes les transactions des 7 derniers mois
+        // 2 requêtes globales pour toutes les transactions de la fenêtre
         const [allRecettesResponse, allDepensesResponse] = await Promise.all([
           api.get(`/transactions?type=RECETTE&dateDebut=${globalStart}&dateFin=${globalEnd}&limit=10000`),
           api.get(`/transactions?type=DEPENSE&dateDebut=${globalStart}&dateFin=${globalEnd}&limit=10000`)
@@ -390,9 +392,9 @@ export default function DashboardPage() {
         const monthsData: { month: string; revenues: number; expenses: number }[] = [];
         const monthMap = new Map<string, { revenues: number; expenses: number; monthName: string }>();
         
-        // Initialiser les 7 mois
-        for (let i = 6; i >= 0; i--) {
-          const monthDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
+        // Initialiser la fenêtre de -2 mois à +3 mois
+        for (let i = -2; i <= 3; i++) {
+          const monthDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + i, 1);
           const monthKey = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`;
           const monthName = monthDate.toLocaleDateString('fr-FR', { month: 'short' });
           monthMap.set(monthKey, { revenues: 0, expenses: 0, monthName });
@@ -418,9 +420,9 @@ export default function DashboardPage() {
           }
         });
         
-        // Convertir en tableau trié par mois
-        for (let i = 6; i >= 0; i--) {
-          const monthDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
+        // Convertir en tableau trié par mois (du plus ancien au plus récent)
+        for (let i = -2; i <= 3; i++) {
+          const monthDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + i, 1);
           const monthKey = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`;
           const monthData = monthMap.get(monthKey);
           if (monthData) {
@@ -434,7 +436,7 @@ export default function DashboardPage() {
         
         setTrendData({
           months: monthsData.map(d => d.month),
-          values: monthsData.map(d => d.revenues),
+          values: monthsData.map(d => d.revenues - d.expenses), // net pour voir les effets des dépenses
         });
 
         // Calculer les soldes totaux par type
@@ -740,11 +742,7 @@ function LineChart({ data }: { data: TrendData }) {
         maintainAspectRatio: false,
         plugins: {
           legend: {
-            display: true,
-            position: "top",
-            labels: {
-              color: "rgba(0,0,0,0.8)",
-            },
+            display: false,
           },
         },
         scales: {
