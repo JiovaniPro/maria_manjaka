@@ -3,6 +3,7 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useRef, useEffect, useCallback } from "react";
+import Chart from "chart.js/auto";
 import { useToast } from "@/components/ToastContainer";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { useLoading } from "@/hooks/useLoading";
@@ -32,11 +33,10 @@ type Transaction = { date: string; description: string; montant: string };
 // Structure de données pour les comptes
 type Account = { name: string; solde: string };
 
-// Structure de données pour le graphique de tendances
+// Structure de données pour le graphique linéaire
 type TrendData = {
   months: string[];
-  revenues: number[];
-  expenses: number[];
+  values: number[]; // en milliers
 };
 
 // ====================================================================
@@ -312,8 +312,7 @@ export default function DashboardPage() {
   const [revenueBreakdown, setRevenueBreakdown] = useState<RevenueBreakdown[]>([]);
   const [trendData, setTrendData] = useState<TrendData>({
     months: [],
-    revenues: [],
-    expenses: [],
+    values: [],
   });
   const [loadingData, setLoadingData] = useState(true);
 
@@ -435,8 +434,7 @@ export default function DashboardPage() {
         
         setTrendData({
           months: monthsData.map(d => d.month),
-          revenues: monthsData.map(d => d.revenues),
-          expenses: monthsData.map(d => d.expenses),
+          values: monthsData.map(d => d.revenues),
         });
 
         // Calculer les soldes totaux par type
@@ -603,7 +601,7 @@ export default function DashboardPage() {
               </p>
             </div>
             <div className="mt-6 h-80 rounded-2xl border border-dashed border-black/10 bg-zinc-50 p-6">
-              <TrendChart data={trendData} />
+              <LineChart data={trendData} />
             </div>
           </article>
 
@@ -672,9 +670,9 @@ export default function DashboardPage() {
           <article className="rounded-3xl border border-black/5 bg-white p-6 shadow-[0_15px_45px_rgba(0,0,0,0.05)]">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold">Aperçus des Comptes</h3>
-              <button className="text-xs uppercase tracking-[0.3em] text-black/40 transition hover:text-black">
+              {/* <button className="text-xs uppercase tracking-[0.3em] text-black/40 transition hover:text-black">
                 Gérer
-              </button>
+              </button> */}
             </div>
             <div className="mt-4 space-y-4">
               {accounts.map((account) => {
@@ -710,224 +708,72 @@ export default function DashboardPage() {
 }
 
 // Composants graphiques
-function TrendChart({ data }: { data: TrendData }) {
-  const [hoveredPoint, setHoveredPoint] = useState<{ month: string; revenue: number; expense: number; x: number; y: number } | null>(null);
-  const maxValue = Math.max(...data.revenues, ...data.expenses);
-  const chartHeight = 250;
-  const chartWidth = 400;
-  const padding = { top: 20, right: 30, bottom: 40, left: 50 };
-  const graphHeight = chartHeight - padding.top - padding.bottom;
-  const graphWidth = chartWidth - padding.left - padding.right;
-  
-  const formatAmount = (value: number) => {
-    const amount = value * 1000;
-    const formatted = amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-    return `${formatted} Ar`;
-  };
+function LineChart({ data }: { data: TrendData }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const chartRef = useRef<Chart | null>(null);
 
-  const pointsRevenues = data.revenues
-    .map((value, index) => {
-      const x =
-        padding.left + (index * graphWidth) / (data.revenues.length - 1);
-      const y = padding.top + graphHeight - (value / maxValue) * graphHeight;
-      return { x, y, value, month: data.months[index] };
+  useEffect(() => {
+    const ctx = canvasRef.current?.getContext("2d");
+    if (!ctx) return;
+    if (chartRef.current) chartRef.current.destroy();
+
+    chartRef.current = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: data.months,
+        datasets: [
+          {
+            label: "My First Dataset",
+            data: data.values,
+            fill: false,
+            borderColor: "rgb(75, 192, 192)",
+            tension: 0.1,
+            pointRadius: 4,
+            pointBackgroundColor: "#fff",
+            pointBorderColor: "rgb(75, 192, 192)",
+            pointBorderWidth: 2,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: true,
+            position: "top",
+            labels: {
+              color: "rgba(0,0,0,0.8)",
+            },
+          },
+        },
+        scales: {
+          x: {
+            grid: {
+              color: "rgba(0,0,0,0.05)",
+            },
+            ticks: {
+              color: "rgba(0,0,0,0.6)",
+            },
+          },
+          y: {
+            grid: {
+              color: "rgba(0,0,0,0.08)",
+            },
+            ticks: {
+              color: "rgba(0,0,0,0.6)",
+            },
+          },
+        },
+      },
     });
 
-  const pointsExpenses = data.expenses
-    .map((value, index) => {
-      const x =
-        padding.left + (index * graphWidth) / (data.expenses.length - 1);
-      const y = padding.top + graphHeight - (value / maxValue) * graphHeight;
-      return { x, y, value, month: data.months[index] };
-    });
-  
-  const handlePointHover = (index: number) => {
-    const revenuePoint = pointsRevenues[index];
-    const expensePoint = pointsExpenses[index];
-    setHoveredPoint({
-      month: revenuePoint.month,
-      revenue: revenuePoint.value,
-      expense: expensePoint.value,
-      x: revenuePoint.x,
-      y: revenuePoint.y - 20
-    });
-  };
-  
-  const handlePointLeave = () => {
-    setHoveredPoint(null);
-  };
-  
-  const revenuePath = pointsRevenues.map(p => `${p.x},${p.y}`).join(" ");
-  const expensePath = pointsExpenses.map(p => `${p.x},${p.y}`).join(" ");
+    return () => {
+      chartRef.current?.destroy();
+    };
+  }, [data]);
 
-  return (
-    <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="h-full w-full">
-      {/* Axe Y */}
-      <line
-        x1={padding.left}
-        y1={padding.top}
-        x2={padding.left}
-        y2={chartHeight - padding.bottom}
-        stroke="rgba(0,0,0,0.2)"
-        strokeWidth="2"
-      />
-      {/* Axe X */}
-      <line
-        x1={padding.left}
-        y1={chartHeight - padding.bottom}
-        x2={chartWidth - padding.right}
-        y2={chartHeight - padding.bottom}
-        stroke="rgba(0,0,0,0.2)"
-        strokeWidth="2"
-      />
-
-      {/* Labels Axe Y */}
-      {[0, 50, 100, 150, 200].map((value, i) => (
-        <g key={i}>
-          <line
-            x1={padding.left - 5}
-            y1={padding.top + graphHeight - (value / maxValue) * graphHeight}
-            x2={padding.left}
-            y2={padding.top + graphHeight - (value / maxValue) * graphHeight}
-            stroke="rgba(0,0,0,0.2)"
-            strokeWidth="1"
-          />
-          <text
-            x={padding.left - 10}
-            y={padding.top + graphHeight - (value / maxValue) * graphHeight + 4}
-            textAnchor="end"
-            fontSize="10"
-            fill="rgba(0,0,0,0.5)"
-          >
-            {value}
-          </text>
-        </g>
-      ))}
-
-      {/* Labels Axe X */}
-      {data.months.map((month, index) => (
-        <text
-          key={month}
-          x={padding.left + (index * graphWidth) / (data.months.length - 1)}
-          y={chartHeight - padding.bottom + 20}
-          textAnchor="middle"
-          fontSize="11"
-          fill="rgba(0,0,0,0.6)"
-        >
-          {month}
-        </text>
-      ))}
-
-      {/* Ligne Revenus */}
-      <polyline
-        points={revenuePath}
-        fill="none"
-        stroke="#16a34a"
-        strokeWidth="3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      {/* Ligne Dépenses */}
-      <polyline
-        points={expensePath}
-        fill="none"
-        stroke="#ef4444"
-        strokeWidth="3"
-        strokeDasharray="6 4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      
-      {/* Points interactifs pour tooltips */}
-      {pointsRevenues.map((point, index) => (
-        <g key={`point-${index}`}>
-          <circle
-            cx={point.x}
-            cy={point.y}
-            r="6"
-            fill="#16a34a"
-            className="cursor-pointer"
-            onMouseEnter={() => handlePointHover(index)}
-            onMouseLeave={handlePointLeave}
-          />
-          <circle
-            cx={pointsExpenses[index].x}
-            cy={pointsExpenses[index].y}
-            r="6"
-            fill="#ef4444"
-            className="cursor-pointer"
-            onMouseEnter={() => handlePointHover(index)}
-            onMouseLeave={handlePointLeave}
-          />
-        </g>
-      ))}
-      
-      {/* Tooltip */}
-      {hoveredPoint && (
-        <g>
-          <rect
-            x={hoveredPoint.x - 80}
-            y={hoveredPoint.y - 50}
-            width="160"
-            height="45"
-            fill="rgba(0, 0, 0, 0.85)"
-            rx="8"
-          />
-          <text
-            x={hoveredPoint.x}
-            y={hoveredPoint.y - 35}
-            textAnchor="middle"
-            fontSize="10"
-            fill="white"
-            fontWeight="bold"
-          >
-            {hoveredPoint.month}
-          </text>
-          <text
-            x={hoveredPoint.x}
-            y={hoveredPoint.y - 20}
-            textAnchor="middle"
-            fontSize="9"
-            fill="#86efac"
-          >
-            Revenus: {formatAmount(hoveredPoint.revenue)}
-          </text>
-          <text
-            x={hoveredPoint.x}
-            y={hoveredPoint.y - 5}
-            textAnchor="middle"
-            fontSize="9"
-            fill="#fca5a5"
-          >
-            Dépenses: {formatAmount(hoveredPoint.expense)}
-          </text>
-        </g>
-      )}
-
-      {/* Label Axe Y */}
-      <text
-        x={padding.left - 35}
-        y={chartHeight / 2}
-        textAnchor="middle"
-        fontSize="11"
-        fill="rgba(0,0,0,0.5)"
-        transform={`rotate(-90, ${padding.left - 35}, ${chartHeight / 2})`}
-      >
-        Montant ($)
-      </text>
-
-      {/* Label Axe X */}
-      <text
-        x={chartWidth / 2}
-        y={chartHeight - 5}
-        textAnchor="middle"
-        fontSize="11"
-        fill="rgba(0,0,0,0.5)"
-      >
-        Mois
-      </text>
-    </svg>
-  );
+  return <canvas ref={canvasRef} aria-label="Line chart" role="img" />;
 }
 
 function DonutChart({

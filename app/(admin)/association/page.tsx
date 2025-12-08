@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useToast } from "@/components/ToastContainer";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { useLoading } from "@/hooks/useLoading";
-import { SearchIcon, EyeIcon } from "@/components/Icons";
+import { SearchIcon, EyeIcon, RefreshIcon } from "@/components/Icons";
 import { sousCategorieService, type SousCategorie } from "@/lib/api/sousCategorieService";
 import { transactionService } from "@/lib/api/transactionService";
 import { categorieService } from "@/lib/api/categorieService";
@@ -23,6 +23,23 @@ export default function AssociationPage() {
     const [selectedSousCategorieName, setSelectedSousCategorieName] = useState<string | null>(null);
     const [transactionsModal, setTransactionsModal] = useState<Transaction[]>([]);
     const [loadingTransactions, setLoadingTransactions] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+
+    // Fonction pour générer une couleur pastel basée sur le nom (cohérente)
+    const getPastelColor = (name: string) => {
+        // Générer un hash simple à partir du nom pour avoir une couleur cohérente
+        let hash = 0;
+        for (let i = 0; i < name.length; i++) {
+            hash = name.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        
+        // Générer des couleurs pastel (HSL avec saturation et luminosité élevées)
+        const hue = Math.abs(hash) % 360;
+        const saturation = 60 + (Math.abs(hash) % 20); // 60-80%
+        const lightness = 85 + (Math.abs(hash) % 10); // 85-95%
+        
+        return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+    };
 
     // Trouver toutes les catégories "Fikambanana" (Recette et Dépense)
     useEffect(() => {
@@ -111,21 +128,41 @@ export default function AssociationPage() {
             loadSousCategories();
         };
 
+        // Rafraîchir quand la fenêtre reprend le focus
+        const handleFocus = () => {
+            loadSousCategories();
+        };
+
         if (typeof window !== 'undefined') {
             window.addEventListener('transaction-updated', handleTransactionUpdate);
             window.addEventListener('sous-categorie-updated', handleSousCategorieUpdate);
+            window.addEventListener('focus', handleFocus);
         }
 
-        // Rafraîchir les sous-catégories toutes les 30 secondes pour détecter les nouvelles
+        // Rafraîchir les sous-catégories toutes les 5 secondes pour un temps réel
+        // Mais seulement si la page est visible
         const interval = setInterval(() => {
-            loadSousCategories();
-        }, 30000);
+            if (!document.hidden) {
+                loadSousCategories();
+            }
+        }, 5000);
+        
+        // Rafraîchir immédiatement quand la page redevient visible
+        const handleVisibilityChange = () => {
+            if (!document.hidden) {
+                loadSousCategories();
+            }
+        };
+        
+        document.addEventListener('visibilitychange', handleVisibilityChange);
 
         return () => {
             clearInterval(interval);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
             if (typeof window !== 'undefined') {
                 window.removeEventListener('transaction-updated', handleTransactionUpdate);
                 window.removeEventListener('sous-categorie-updated', handleSousCategorieUpdate);
+                window.removeEventListener('focus', handleFocus);
             }
         };
     }, [categoryIds, showToast]);
@@ -188,22 +225,65 @@ export default function AssociationPage() {
             calculateBalances();
         };
 
+        // Rafraîchir quand la fenêtre reprend le focus
+        const handleFocus = () => {
+            calculateBalances();
+        };
+
         if (typeof window !== 'undefined') {
             window.addEventListener('transaction-updated', handleTransactionUpdate);
+            window.addEventListener('focus', handleFocus);
         }
 
-        // Rafraîchir les données toutes les 30 secondes pour détecter les nouvelles transactions
+        // Rafraîchir les données toutes les 5 secondes pour un temps réel
+        // Mais seulement si la page est visible
         const interval = setInterval(() => {
-            calculateBalances();
-        }, 30000);
+            if (!document.hidden) {
+                calculateBalances();
+            }
+        }, 5000);
+        
+        // Rafraîchir immédiatement quand la page redevient visible
+        const handleVisibilityChange = () => {
+            if (!document.hidden) {
+                calculateBalances();
+            }
+        };
+        
+        document.addEventListener('visibilitychange', handleVisibilityChange);
 
         return () => {
             clearInterval(interval);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
             if (typeof window !== 'undefined') {
                 window.removeEventListener('transaction-updated', handleTransactionUpdate);
+                window.removeEventListener('focus', handleFocus);
             }
         };
     }, [groupedSousCategories]);
+
+    // Fonction de rafraîchissement manuel
+    const handleRefresh = async () => {
+        setIsRefreshing(true);
+        try {
+            // Recharger les catégories
+            const categories = await categorieService.getAll();
+            const fikambananaCategories = categories.filter(
+                (cat) => cat.nom.toLowerCase().includes("fikambanana")
+            );
+            if (fikambananaCategories.length > 0) {
+                setCategoryIds(fikambananaCategories.map(c => c.id));
+            }
+            
+            // Les useEffect se déclencheront automatiquement pour recharger les données
+            showToast("Données rafraîchies avec succès", "success");
+        } catch (error) {
+            console.error("Erreur lors du rafraîchissement:", error);
+            showToast("Erreur lors du rafraîchissement", "error");
+        } finally {
+            setIsRefreshing(false);
+        }
+    };
 
     // Filtrer les groupes de sous-catégories selon la recherche
     const filteredSousCategories = useMemo(() => {
@@ -214,10 +294,11 @@ export default function AssociationPage() {
         );
     }, [groupedSousCategories, searchTerm]);
 
-    // Charger les 3 dernières transactions d'un groupe de sous-catégories
-    const handleViewTransactions = async (group: {nom: string, ids: number[]}) => {
-        setSelectedSousCategorieName(group.nom);
-        setLoadingTransactions(true);
+    // Fonction pour charger les transactions d'un groupe
+    const loadGroupTransactions = async (group: {nom: string, ids: number[]}, showLoading = false) => {
+        if (showLoading) {
+            setLoadingTransactions(true);
+        }
         try {
             const allTransactions = await transactionService.getAll({ limit: 10000 });
             const groupTransactions = allTransactions
@@ -251,9 +332,59 @@ export default function AssociationPage() {
             console.error("Erreur lors du chargement des transactions:", error);
             showToast("Erreur lors du chargement des transactions", "error");
         } finally {
-            setLoadingTransactions(false);
+            if (showLoading) {
+                setLoadingTransactions(false);
+            }
         }
     };
+
+    // Charger les 3 dernières transactions d'un groupe de sous-catégories
+    const handleViewTransactions = async (group: {nom: string, ids: number[]}) => {
+        setSelectedSousCategorieName(group.nom);
+        await loadGroupTransactions(group, true);
+    };
+
+    // Rafraîchir les transactions du modal en temps réel quand il est ouvert
+    useEffect(() => {
+        if (!selectedSousCategorieName) return;
+
+        // Trouver le groupe correspondant
+        const group = groupedSousCategories.find(g => g.nom === selectedSousCategorieName);
+        if (!group) return;
+
+        // Écouter les événements de mise à jour
+        const handleTransactionUpdate = () => {
+            loadGroupTransactions(group, false);
+        };
+
+        if (typeof window !== 'undefined') {
+            window.addEventListener('transaction-updated', handleTransactionUpdate);
+        }
+
+        // Rafraîchir toutes les 5 secondes si le modal est ouvert
+        const interval = setInterval(() => {
+            if (!document.hidden) {
+                loadGroupTransactions(group, false);
+            }
+        }, 5000);
+
+        // Rafraîchir immédiatement quand la page redevient visible
+        const handleVisibilityChange = () => {
+            if (!document.hidden) {
+                loadGroupTransactions(group, false);
+            }
+        };
+        
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            if (typeof window !== 'undefined') {
+                window.removeEventListener('transaction-updated', handleTransactionUpdate);
+            }
+        };
+    }, [selectedSousCategorieName, groupedSousCategories]);
 
     if (isLoading || (loadingData && groupedSousCategories.length === 0 && categoryIds.length > 0)) {
         return <LoadingScreen />;
@@ -281,15 +412,26 @@ export default function AssociationPage() {
                     <p className="text-sm text-black/60">Gestion des Associations</p>
                     <h1 className="text-2xl font-semibold">Association</h1>
                 </div>
-                <div className="flex w-full max-w-sm items-center gap-3 rounded-full border border-black/10 bg-white px-4 py-2">
-                    <SearchIcon />
-                    <input
-                        type="text"
-                        placeholder="Rechercher une association..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="flex-1 bg-transparent text-sm outline-none"
-                    />
+                <div className="flex items-center gap-3">
+                    <div className="flex w-full max-w-sm items-center gap-3 rounded-full border border-black/10 bg-white px-4 py-2">
+                        <SearchIcon />
+                        <input
+                            type="text"
+                            placeholder="Rechercher une association..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="flex-1 bg-transparent text-sm outline-none"
+                        />
+                    </div>
+                    {/* <button
+                        onClick={handleRefresh}
+                        disabled={isRefreshing}
+                        className="flex items-center gap-2 rounded-full border border-blue-500 bg-blue-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Rafraîchir les données"
+                    >
+                        <RefreshIcon />
+                        <span>{isRefreshing ? "Rafraîchissement..." : "Rafraîchir"}</span>
+                    </button> */}
                 </div>
             </header>
 
@@ -313,15 +455,19 @@ export default function AssociationPage() {
                             const normalizedName = group.nom.toLowerCase().trim();
                             const solde = balances[normalizedName] || 0;
                             const isPositive = solde >= 0;
+                            const pastelColor = getPastelColor(group.nom);
 
                             return (
                                 <article
                                     key={normalizedName}
-                                    className="group relative rounded-3xl border border-black/5 bg-white p-6 shadow-[0_15px_45px_rgba(0,0,0,0.05)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_60px_rgba(0,0,0,0.1)]"
+                                    className="group relative rounded-3xl border border-black/5 p-6 shadow-[0_15px_45px_rgba(0,0,0,0.05)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_60px_rgba(0,0,0,0.1)]"
+                                    style={{
+                                        backgroundColor: pastelColor,
+                                    }}
                                 >
                                     <button
                                         onClick={() => handleViewTransactions(group)}
-                                        className="absolute top-4 right-4 rounded-full p-2 text-black/40 transition hover:bg-black/5 hover:text-blue-500"
+                                        className="absolute top-4 right-4 rounded-full p-2 text-black/40 transition hover:bg-black/10 hover:text-blue-600"
                                         title="Voir les dernières transactions"
                                     >
                                         <EyeIcon />
@@ -331,11 +477,11 @@ export default function AssociationPage() {
                                             {group.nom}
                                         </h3>
                                     </div>
-                                    <div className="mt-4 border-t border-black/5 pt-4">
-                                        <p className="text-xs text-black/50">Solde</p>
+                                    <div className="mt-4 border-t border-black/10 pt-4">
+                                        <p className="text-xs text-black/60 font-medium">Solde</p>
                                         <p
                                             className={`mt-2 text-2xl font-bold ${
-                                                isPositive ? "text-emerald-600" : "text-red-600"
+                                                isPositive ? "text-emerald-700" : "text-red-700"
                                             }`}
                                         >
                                             {isPositive ? "+" : ""}
