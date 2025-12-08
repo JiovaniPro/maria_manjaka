@@ -3,6 +3,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { EyeIcon, EyeOffIcon } from "@/components/Icons";
 import api from "@/services/api"; // Import du service API
 
 export default function ConnexionPage() {
@@ -11,6 +12,7 @@ export default function ConnexionPage() {
   const [motDePasse, setMotDePasse] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,16 +87,26 @@ export default function ConnexionPage() {
             <label className="text-xs uppercase tracking-[0.3em]" htmlFor="password">
               Mot de passe
             </label>
-            <input
-              id="password"
-              type="password"
-              value={motDePasse}
-              onChange={(e) => setMotDePasse(e.target.value)}
-              required
-              disabled={isLoading}
-              className="mt-2 w-full rounded-2xl border border-white/20 bg-black/60 px-4 py-3 text-sm text-white placeholder-white/40 outline-none transition focus:border-white focus:ring-2 focus:ring-white/60 disabled:opacity-50"
-              placeholder="••••••••"
-            />
+            <div className="relative">
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                value={motDePasse}
+                onChange={(e) => setMotDePasse(e.target.value)}
+                required
+                disabled={isLoading}
+                className="mt-2 w-full rounded-2xl border border-white/20 bg-black/60 px-4 py-3 pr-12 text-sm text-white placeholder-white/40 outline-none transition focus:border-white focus:ring-2 focus:ring-white/60 disabled:opacity-50"
+                placeholder="••••••••"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute inset-y-0 right-3 mt-2 flex items-center text-white/70 transition hover:text-white"
+                aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+              >
+                {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center justify-between text-xs text-white/60">

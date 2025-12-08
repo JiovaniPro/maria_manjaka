@@ -40,7 +40,7 @@ export function Sidebar() {
         await logout();
         showToast("Déconnexion réussie", "success");
         setTimeout(() => {
-            router.replace("/connexion");
+            router.replace("/");
         }, 500);
     };
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-export function LoadingScreen() {
+export function LoadingScreen({ fullScreen = false }: { fullScreen?: boolean }) {
   const [bars, setBars] = useState([20, 40, 60, 80]);
 
   useEffect(() => {
@@ -18,8 +18,12 @@ export function LoadingScreen() {
     return () => clearInterval(interval);
   }, []);
 
+  const containerClasses = fullScreen
+    ? "fixed inset-0 z-[10000] flex items-center justify-center bg-zinc-50"
+    : "flex min-h-[50vh] w-full items-end justify-center rounded-2xl bg-zinc-50 mt-12";
+
   return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-zinc-50">
+    <div className={containerClasses}>
       <div className="text-center">
         <div className="mb-6 flex items-center justify-center gap-3">
           <svg

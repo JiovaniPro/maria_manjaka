@@ -23,9 +23,9 @@
          setIsAuthorized(true);
      }, [router]);
  
-     if (!isAuthorized) {
-         return <LoadingScreen />;
-     }
+    if (!isAuthorized) {
+        return <LoadingScreen fullScreen />;
+    }
  
      return (
          <div className="flex min-h-screen bg-zinc-50 font-sans text-black">

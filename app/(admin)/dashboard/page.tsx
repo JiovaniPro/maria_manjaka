@@ -744,6 +744,15 @@ function LineChart({ data }: { data: TrendData }) {
           legend: {
             display: false,
           },
+          tooltip: {
+            callbacks: {
+              label: (context) => {
+                const value = context.parsed.y ?? 0;
+                const amount = value * 1000; // revenir à l'unité complète
+                return new Intl.NumberFormat("fr-FR").format(amount);
+              },
+            },
+          },
         },
         scales: {
           x: {
