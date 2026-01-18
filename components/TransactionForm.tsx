@@ -49,6 +49,7 @@ type TransactionFormProps = {
     chequeExists?: boolean;
     chequeChecking?: boolean;
     submitDisabled?: boolean;
+    disableTypeChange?: boolean;
 };
 
 export function TransactionForm({
@@ -74,6 +75,7 @@ export function TransactionForm({
     chequeExists = false,
     chequeChecking = false,
     submitDisabled = false,
+    disableTypeChange = false,
 }: TransactionFormProps) {
     const selectValue = lockCompte && lockedCompteName ? lockedCompteName : formData.compte;
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -140,20 +142,22 @@ export function TransactionForm({
                             <button
                                 type="button"
                                 onClick={() => handleTypeChange("Revenu")}
+                                disabled={disableTypeChange}
                                 className={`flex-1 rounded-xl border-2 px-4 py-3 text-center text-sm font-semibold transition ${formData.type === "Revenu"
                                     ? "border-emerald-500 bg-emerald-50 text-emerald-700"
                                     : "border-black/10 bg-zinc-50 text-black/70 hover:bg-zinc-100"
-                                    }`}
+                                    } ${disableTypeChange ? "opacity-50 cursor-not-allowed" : ""}`}
                             >
                                 Recette (Revenu)
                             </button>
                             <button
                                 type="button"
                                 onClick={() => handleTypeChange("Dépense")}
+                                disabled={disableTypeChange}
                                 className={`flex-1 rounded-xl border-2 px-4 py-3 text-center text-sm font-semibold transition ${formData.type === "Dépense"
                                     ? "border-red-500 bg-red-50 text-red-700"
                                     : "border-black/10 bg-zinc-50 text-black/70 hover:bg-zinc-100"
-                                    }`}
+                                    } ${disableTypeChange ? "opacity-50 cursor-not-allowed" : ""}`}
                             >
                                 Dépense
                             </button>

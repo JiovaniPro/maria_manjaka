@@ -19,14 +19,29 @@ import {
 type NavItem = { label: string; icon: any; href: string };
 type PreferenceItem = { label: string; icon: any; href?: string };
 
-const navItems: NavItem[] = [
-    { label: "Dashboard", icon: DashboardIcon, href: "/dashboard" },
-    { label: "Transactions", icon: TransactionsIcon, href: "/transaction" },
-    { label: "Catégories", icon: CategoriesIcon, href: "/categorie" },
-    { label: "Association", icon: AssociationIcon, href: "/association" },
-    { label: "Transaction Bancaire", icon: UsersIcon, href: "/banque" },
-    { label: "Récapitulation", icon: ReportsIcon, href: "/recapitulation" },
-];
+const getNavItems = (isAdmin: boolean): NavItem[] => {
+    const baseItems: NavItem[] = [
+        { label: "Dashboard", icon: DashboardIcon, href: "/dashboard" },
+        { label: "Transactions", icon: TransactionsIcon, href: "/transaction" },
+    ];
+    
+    if (isAdmin) {
+        return [
+            ...baseItems,
+            { label: "Catégories", icon: CategoriesIcon, href: "/categorie" },
+            { label: "Association", icon: AssociationIcon, href: "/association" },
+            { label: "Transaction Bancaire", icon: UsersIcon, href: "/banque" },
+            { label: "Récapitulation", icon: ReportsIcon, href: "/recapitulation" },
+            { label: "Comptes Secrétaires", icon: UsersIcon, href: "/comptes-secretaires" },
+        ];
+    }
+    
+    // Pour les secrétaires : Dashboard, Transactions, Catégories (lecture seule)
+    return [
+        ...baseItems,
+        { label: "Catégories", icon: CategoriesIcon, href: "/categorie" },
+    ];
+};
 
 const preferenceItems: PreferenceItem[] = [
     { label: "Paramètres", icon: SettingsIcon, href: "/parametre" },
@@ -36,7 +51,10 @@ export function Sidebar() {
     const pathname = usePathname();
     const router = useRouter();
     const { showToast } = useToast();
-    const { logout } = useAuth();
+    const { logout, user } = useAuth();
+    
+    const isAdmin = user?.role === 'ADMIN' || !user?.role;
+    const isSecretaire = user?.role === 'SECRETAIRE';
 
     const handleLogout = async () => {
         await logout();
@@ -60,7 +78,7 @@ export function Sidebar() {
                         Menu
                     </p>
                     <ul className="space-y-2">
-                        {navItems.map(({ label, icon: Icon, href }) => {
+                        {getNavItems(isAdmin).map(({ label, icon: Icon, href }) => {
                             const isActive = pathname === href;
                             return (
                                 <li key={label}>

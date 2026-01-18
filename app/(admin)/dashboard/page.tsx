@@ -7,8 +7,11 @@ import Chart from "chart.js/auto";
 import { useToast } from "@/components/ToastContainer";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { useLoading } from "@/hooks/useLoading";
+import { useAuth } from "@/contexts/AuthContext";
 import { SearchIcon, EyeIcon, EyeOffIcon } from "@/components/Icons";
-import api from "@/services/api";
+import api from "@/lib/api/apiClient";
+import { apiCache } from "@/lib/api/cache";
+import { compteSecretaireService } from "@/lib/api/compteSecretaireService";
 
 // ====================================================================
 // CONFIG & TYPES
@@ -304,7 +307,10 @@ export default function DashboardPage() {
   const pathname = usePathname();
   const router = useRouter();
   const { showToast } = useToast();
+  const { user } = useAuth();
   const isLoading = useLoading(1500);
+  
+  const isSecretaire = user?.role === 'SECRETAIRE';
 
   const [financialCards, setFinancialCards] = useState<FinancialCard[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -344,17 +350,121 @@ export default function DashboardPage() {
       try {
         setLoadingData(true);
 
-        // 1. Récupérer les stats du mois
         const currentDate = new Date();
         const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).toISOString();
         const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).toISOString();
 
+        // Version secrétaire : données simplifiées
+        if (isSecretaire && user?.compteSecretaireId) {
+          // Récupérer le compte secrétaire
+          const monCompte = await compteSecretaireService.getMonCompte();
+          
+          // Récupérer les dépenses de la semaine (7 derniers jours)
+          const startOfWeek = new Date(currentDate);
+          startOfWeek.setDate(currentDate.getDate() - 6); // 7 jours incluant aujourd'hui
+          startOfWeek.setHours(0, 0, 0, 0);
+          
+          // Récupérer les recettes (alimentations) du mois
+          const recettesResponse = await api.get(
+            `/transactions?type=RECETTE&compteId=${user.compteSecretaireId}&dateDebut=${startOfMonth}&dateFin=${endOfMonth}&limit=1000`
+          );
+          // apiClient retourne directement les données
+          const recettesData = Array.isArray(recettesResponse) ? recettesResponse : (recettesResponse?.data || []);
+          
+          // Calculer le solde initial attribué ce mois (somme des recettes/alimentations)
+          const soldeInitialAttribue = recettesData.reduce((sum: number, t: any) => sum + parseFloat(t.montant || 0), 0);
+          
+          const depensesResponse = await api.get(
+            `/transactions?type=DEPENSE&compteId=${user.compteSecretaireId}&dateDebut=${startOfWeek.toISOString()}&dateFin=${endOfMonth}&limit=1000`
+          );
+          // apiClient retourne directement les données
+          const depensesData = Array.isArray(depensesResponse) ? depensesResponse : (depensesResponse?.data || []);
+          
+          // Calculer le total des dépenses du mois
+          const depensesMois = depensesData.filter((t: any) => {
+            const tDate = new Date(t.dateTransaction);
+            return tDate >= new Date(startOfMonth) && tDate <= new Date(endOfMonth);
+          });
+          const totalDepenses = depensesMois.reduce((sum: number, t: any) => sum + parseFloat(t.montant || 0), 0);
+          
+          // Grouper les dépenses par jour de la semaine
+          const joursSemaine = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+          const depensesParJour = new Map<string, number>();
+          
+          // Initialiser tous les jours à 0
+          for (let i = 0; i < 7; i++) {
+            const date = new Date(startOfWeek);
+            date.setDate(startOfWeek.getDate() + i);
+            const jourKey = joursSemaine[date.getDay()];
+            depensesParJour.set(jourKey, 0);
+          }
+          
+          // Grouper les dépenses par jour
+          depensesData.forEach((t: any) => {
+            const tDate = new Date(t.dateTransaction);
+            if (tDate >= startOfWeek && tDate <= currentDate) {
+              const jourKey = joursSemaine[tDate.getDay()];
+              const current = depensesParJour.get(jourKey) || 0;
+              depensesParJour.set(jourKey, current + parseFloat(t.montant || 0));
+            }
+          });
+          
+          // Créer les données pour le graphique (jours de la semaine)
+          const jours = Array.from(depensesParJour.keys());
+          const valeurs = Array.from(depensesParJour.values()).map(v => v / 1000); // En milliers
+          
+          setTrendData({
+            months: jours,
+            values: valeurs,
+          });
+          
+          // Cartes financières pour secrétaire (ordre: Solde initial, Solde actuel, Total dépenses)
+          setFinancialCards([
+            {
+              title: "Solde initial attribué",
+              amount: formatCurrency(soldeInitialAttribue),
+              variation: "",
+              trend: "up",
+            },
+            {
+              title: "Solde actuel",
+              amount: formatCurrency(parseFloat(monCompte.soldeActuel.toString())),
+              variation: "",
+              trend: "up",
+            },
+            {
+              title: "Total des dépenses",
+              amount: formatCurrency(totalDepenses),
+              variation: "",
+              trend: "down",
+            },
+          ]);
+          
+          // Dernières transactions (dépenses seulement)
+          setTransactions(depensesData.slice(0, 3).map((t: any) => ({
+            date: formatDate(t.dateTransaction),
+            description: t.description || 'Dépense',
+            montant: `-${formatCurrency(t.montant)}`,
+          })));
+          
+          // Pas de comptes à afficher pour les secrétaires
+          setAccounts([]);
+          setRevenueBreakdown([]);
+          
+          setLoadingData(false);
+          return;
+        }
+
+        // Version admin : logique existante
+        // 1. Récupérer les stats du mois
         const statsResponse = await api.get(`/transactions/stats?dateDebut=${startOfMonth}&dateFin=${endOfMonth}`);
-        const stats = statsResponse.data.data;
+        // apiClient retourne directement les données
+        const stats = statsResponse?.data || statsResponse;
 
         // 2. Récupérer tous les comptes en une seule requête (optimisation)
         const allComptesResponse = await api.get('/comptes');
-        const comptesData = allComptesResponse.data.data || [];
+        // apiClient retourne directement les données
+        const comptesData = Array.isArray(allComptesResponse) ? allComptesResponse : (allComptesResponse?.data || []);
         
         // Filtrer côté frontend
         const comptesCaisse = comptesData.filter((c: any) => c.type === 'CAISSE');
@@ -362,13 +472,15 @@ export default function DashboardPage() {
 
         // 3. Récupérer les dernières transactions
         const transactionsResponse = await api.get('/transactions?limit=3');
-        const transactionsData = transactionsResponse.data.data;
+        // apiClient retourne directement les données
+        const transactionsData = Array.isArray(transactionsResponse) ? transactionsResponse : (transactionsResponse?.data || []);
 
         // 4. Récupérer toutes les transactions RECETTE du mois pour la répartition
         const recettesResponse = await api.get(
           `/transactions?type=RECETTE&dateDebut=${startOfMonth}&dateFin=${endOfMonth}&limit=1000`
         );
-        const recettesData = recettesResponse.data.data || [];
+        // apiClient retourne directement les données
+        const recettesData = Array.isArray(recettesResponse) ? recettesResponse : (recettesResponse?.data || []);
 
         // 5. Récupérer les transactions pour une fenêtre dynamique :
         //    - 2 mois avant le mois courant
@@ -385,8 +497,9 @@ export default function DashboardPage() {
           api.get(`/transactions?type=DEPENSE&dateDebut=${globalStart}&dateFin=${globalEnd}&limit=10000`)
         ]);
         
-        const allRecettes = allRecettesResponse.data.data || [];
-        const allDepenses = allDepensesResponse.data.data || [];
+        // apiClient retourne directement les données
+        const allRecettes = Array.isArray(allRecettesResponse) ? allRecettesResponse : (allRecettesResponse?.data || []);
+        const allDepenses = Array.isArray(allDepensesResponse) ? allDepensesResponse : (allDepensesResponse?.data || []);
         
         // Grouper par mois côté frontend
         const monthsData: { month: string; revenues: number; expenses: number }[] = [];
@@ -525,6 +638,10 @@ export default function DashboardPage() {
 
     // Écouter les événements de mise à jour des transactions
     const handleTransactionUpdate = () => {
+      // Invalider le cache avant de rafraîchir pour forcer la récupération des nouvelles données
+      apiCache.invalidatePattern('GET_/transactions');
+      apiCache.invalidatePattern('GET_/comptes');
+      apiCache.invalidatePattern('GET_/transactions/stats');
       fetchData();
     };
 
@@ -536,7 +653,7 @@ export default function DashboardPage() {
       window.removeEventListener('compte-updated', handleTransactionUpdate);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Exécuter une seule fois au montage du composant
+  }, [isSecretaire, user?.compteSecretaireId]); // Re-exécuter si le rôle change
 
   if (isLoading || (loadingData && financialCards.length === 0)) {
     return <LoadingScreen />;
@@ -546,7 +663,7 @@ export default function DashboardPage() {
     <div>
       <header className="flex flex-wrap items-center justify-between gap-6">
         <div>
-          <p className="text-sm text-black/60">Bonjour, admin</p>
+          <p className="text-sm text-black/60">Bonjour, {isSecretaire ? 'secrétaire' : 'admin'}</p>
           <h1 className="text-2xl font-semibold">Bienvenue sur le tableau de bord</h1>
         </div>
         <div className="flex w-full max-w-sm items-center gap-3 rounded-full border border-black/10 bg-white px-4 py-2">
@@ -563,7 +680,7 @@ export default function DashboardPage() {
           <h2 className="text-xl font-semibold">Tableau de Bord Financier</h2>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+        <div className={`grid gap-6 ${isSecretaire ? 'md:grid-cols-3' : 'md:grid-cols-2 xl:grid-cols-4'}`}>
           {financialCards.map((card) =>
             card.title === "Solde en banque" ? (
               <SecureFinancialCard
@@ -596,10 +713,10 @@ export default function DashboardPage() {
           <article className="rounded-3xl border border-black/5 bg-white p-6 shadow-[0_15px_45px_rgba(0,0,0,0.05)]">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold">
-                Graphique des Tendances (Annuel)
+                {isSecretaire ? 'Dépenses de la Semaine' : 'Graphique des Tendances (Annuel)'}
               </h3>
               <p className="text-xs uppercase tracking-[0.3em] text-black/40">
-                Revenus vs Dépenses
+                {isSecretaire ? '7 derniers jours' : 'Revenus vs Dépenses'}
               </p>
             </div>
             <div className="mt-6 h-80 rounded-2xl border border-dashed border-black/10 bg-zinc-50 p-6">
@@ -607,102 +724,137 @@ export default function DashboardPage() {
             </div>
           </article>
 
-          <article className="rounded-3xl border border-black/5 bg-white p-6 shadow-[0_15px_45px_rgba(0,0,0,0.05)]">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Répartition des Revenus</h3>
-              <span className="text-sm text-black/60">
-                {new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
-              </span>
-            </div>
-            <div className="mt-6 flex flex-col items-center justify-center gap-8 md:flex-row">
-              {revenueBreakdown.length > 0 ? (
-                <>
-                  <DonutChart data={revenueBreakdown} />
-                  <ul className="space-y-4 text-sm">
-                    {revenueBreakdown.map((item) => (
-                      <li key={item.label} className="flex items-center gap-3">
-                        <span
-                          className="inline-block h-4 w-4 rounded-full"
-                          style={{ backgroundColor: item.color }}
-                        />
-                        <span className="flex-1 font-medium">{item.label}</span>
-                        <span className="font-semibold text-black">
-                          {item.value}%
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-12 text-black/40">
-                  <p className="text-sm">Aucune recette enregistrée ce mois</p>
-                </div>
-              )}
-            </div>
-          </article>
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-2">
-          <article className="rounded-3xl border border-black/5 bg-white p-6 shadow-[0_15px_45px_rgba(0,0,0,0.05)]">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Dernières Transactions</h3>
-              <button
-                onClick={() => router.push('/transaction')}
-                className="cursor-pointer text-xs uppercase tracking-[0.3em] text-black/40 transition hover:text-black hover:underline"
-              >
-                Voir tout
-              </button>
-            </div>
-            <div className="mt-4 space-y-4">
-              {transactions.map((tx, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between rounded-2xl border border-black/5 px-4 py-3 transition hover:bg-zinc-50"
+          {isSecretaire ? (
+            <article className="rounded-3xl border border-black/5 bg-white p-6 shadow-[0_15px_45px_rgba(0,0,0,0.05)]">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Dernières Transactions</h3>
+                <button
+                  onClick={() => router.push('/transaction')}
+                  className="cursor-pointer text-xs uppercase tracking-[0.3em] text-black/40 transition hover:text-black hover:underline"
                 >
-                  <div>
-                    <p className="text-sm font-medium">{tx.description}</p>
-                    <p className="text-xs text-black/50">{tx.date}</p>
-                  </div>
-                  <p className="text-sm font-semibold">{tx.montant}</p>
-                </div>
-              ))}
-            </div>
-          </article>
-
-          <article className="rounded-3xl border border-black/5 bg-white p-6 shadow-[0_15px_45px_rgba(0,0,0,0.05)]">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Aperçus des Comptes</h3>
-              {/* <button className="text-xs uppercase tracking-[0.3em] text-black/40 transition hover:text-black">
-                Gérer
-              </button> */}
-            </div>
-            <div className="mt-4 space-y-4">
-              {accounts.map((account) => {
-                const nameLower = account.name.toLowerCase();
-                const isSensitiveAccount =
-                  nameLower.includes('banque') || nameLower.includes('bni');
-                return isSensitiveAccount ? (
-                  <SecureAccountCard
-                    key={account.name}
-                    account={account}
-                    showToast={showToast}
-                  />
-                ) : (
+                  Voir tout
+                </button>
+              </div>
+              <div className="mt-4 space-y-4">
+                {transactions.map((tx, index) => (
                   <div
-                    key={account.name}
+                    key={index}
                     className="flex items-center justify-between rounded-2xl border border-black/5 px-4 py-3 transition hover:bg-zinc-50"
                   >
                     <div>
-                      <p className="text-sm font-medium">{account.name}</p>
-                      <p className="text-xs text-black/50">Solde actuel</p>
+                      <p className="text-sm font-medium">{tx.description}</p>
+                      <p className="text-xs text-black/50">{tx.date}</p>
                     </div>
-                    <p className="text-sm font-semibold">{account.solde}</p>
+                    <p className="text-sm font-semibold">{tx.montant}</p>
                   </div>
-                );
-              })}
-            </div>
-          </article>
+                ))}
+                {transactions.length === 0 && (
+                  <div className="py-8 text-center text-sm text-black/40">
+                    <p>Aucune transaction récente</p>
+                  </div>
+                )}
+              </div>
+            </article>
+          ) : (
+            <article className="rounded-3xl border border-black/5 bg-white p-6 shadow-[0_15px_45px_rgba(0,0,0,0.05)]">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Répartition des Revenus</h3>
+                <span className="text-sm text-black/60">
+                  {new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+                </span>
+              </div>
+              <div className="mt-6 flex flex-col items-center justify-center gap-8 md:flex-row">
+                {revenueBreakdown.length > 0 ? (
+                  <>
+                    <DonutChart data={revenueBreakdown} />
+                    <ul className="space-y-4 text-sm">
+                      {revenueBreakdown.map((item) => (
+                        <li key={item.label} className="flex items-center gap-3">
+                          <span
+                            className="inline-block h-4 w-4 rounded-full"
+                            style={{ backgroundColor: item.color }}
+                          />
+                          <span className="flex-1 font-medium">{item.label}</span>
+                          <span className="font-semibold text-black">
+                            {item.value}%
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 text-black/40">
+                    <p className="text-sm">Aucune recette enregistrée ce mois</p>
+                  </div>
+                )}
+              </div>
+            </article>
+          )}
         </div>
+
+        {!isSecretaire && (
+          <div className="grid gap-6 lg:grid-cols-2">
+            <article className="rounded-3xl border border-black/5 bg-white p-6 shadow-[0_15px_45px_rgba(0,0,0,0.05)]">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Dernières Transactions</h3>
+                <button
+                  onClick={() => router.push('/transaction')}
+                  className="cursor-pointer text-xs uppercase tracking-[0.3em] text-black/40 transition hover:text-black hover:underline"
+                >
+                  Voir tout
+                </button>
+              </div>
+              <div className="mt-4 space-y-4">
+                {transactions.map((tx, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between rounded-2xl border border-black/5 px-4 py-3 transition hover:bg-zinc-50"
+                  >
+                    <div>
+                      <p className="text-sm font-medium">{tx.description}</p>
+                      <p className="text-xs text-black/50">{tx.date}</p>
+                    </div>
+                    <p className="text-sm font-semibold">{tx.montant}</p>
+                  </div>
+                ))}
+              </div>
+            </article>
+
+            <article className="rounded-3xl border border-black/5 bg-white p-6 shadow-[0_15px_45px_rgba(0,0,0,0.05)]">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Aperçus des Comptes</h3>
+                {/* <button className="text-xs uppercase tracking-[0.3em] text-black/40 transition hover:text-black">
+                  Gérer
+                </button> */}
+              </div>
+              <div className="mt-4 space-y-4">
+                {accounts.map((account) => {
+                  const nameLower = account.name.toLowerCase();
+                  const isSensitiveAccount =
+                    nameLower.includes('banque') || nameLower.includes('bni');
+                  return isSensitiveAccount ? (
+                    <SecureAccountCard
+                      key={account.name}
+                      account={account}
+                      showToast={showToast}
+                    />
+                  ) : (
+                    <div
+                      key={account.name}
+                      className="flex items-center justify-between rounded-2xl border border-black/5 px-4 py-3 transition hover:bg-zinc-50"
+                    >
+                      <div>
+                        <p className="text-sm font-medium">{account.name}</p>
+                        <p className="text-xs text-black/50">Solde actuel</p>
+                      </div>
+                      <p className="text-sm font-semibold">{account.solde}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </article>
+          </div>
+        )}
       </section>
       <SecurityLockModal />
     </div>

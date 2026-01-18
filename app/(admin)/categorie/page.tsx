@@ -5,6 +5,7 @@ import type { ReactElement } from "react";
 import { useToast } from "@/components/ToastContainer";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { useLoading } from "@/hooks/useLoading";
+import { useAuth } from "@/contexts/AuthContext";
 import { ToggleSwitch } from "@/components/ToggleSwitch";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import api from "@/services/api";
@@ -160,7 +161,11 @@ function CategoryFormModal({
 
 export default function CategoriesPage() {
   const { showToast } = useToast();
+  const { user } = useAuth();
   const isLoading = useLoading(1200);
+  
+  const isSecretaire = user?.role === 'SECRETAIRE';
+  const isReadOnly = isSecretaire;
 
   // 1. Refactorisation: Utilisation de useState pour les données de l'API
   const [categories, setCategories] = useState<Category[]>([]);
@@ -426,9 +431,9 @@ export default function CategoriesPage() {
   return (
     <div>
       <header className="mb-8">
-        <h1 className="text-3xl font-bold">Gestion des Catégories</h1>
+        <h1 className="text-3xl font-bold">{isReadOnly ? 'Catégories' : 'Gestion des Catégories'}</h1>
         <p className="mt-2 text-sm text-black/60">
-          Organisez et classez les flux financiers
+          {isReadOnly ? 'Consultation des catégories disponibles' : 'Organisez et classez les flux financiers'}
         </p>
       </header>
 
@@ -442,13 +447,15 @@ export default function CategoriesPage() {
             placeholder="Rechercher par nom ou code..."
           />
         </div>
-        <button
-          onClick={() => handleOpenModal()}
-          className="flex items-center gap-2 rounded-2xl bg-black px-6 py-3 text-sm font-semibold text-white transition hover:bg-black/90"
-        >
-          <PlusIcon />
-          <span>Ajouter une Catégorie</span>
-        </button>
+        {!isReadOnly && (
+          <button
+            onClick={() => handleOpenModal()}
+            className="flex items-center gap-2 rounded-2xl bg-black px-6 py-3 text-sm font-semibold text-white transition hover:bg-black/90"
+          >
+            <PlusIcon />
+            <span>Ajouter une Catégorie</span>
+          </button>
+        )}
       </div>
 
       <div className="mb-6 flex gap-2 border-b border-black/10">
@@ -536,20 +543,24 @@ export default function CategoriesPage() {
                       >
                         <EyeIcon />
                       </button>
-                      <button
-                        onClick={() => handleOpenModal(category)}
-                        className="rounded-lg p-2 text-black/60 transition hover:bg-black/5 hover:text-black"
-                        title="Modifier"
-                      >
-                        <EditIcon />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteClick(category)}
-                        className="rounded-lg p-2 text-black/60 transition hover:bg-red-50 hover:text-red-600"
-                        title="Supprimer"
-                      >
-                        <DeleteIcon />
-                      </button>
+                      {!isReadOnly && (
+                        <>
+                          <button
+                            onClick={() => handleOpenModal(category)}
+                            className="rounded-lg p-2 text-black/60 transition hover:bg-black/5 hover:text-black"
+                            title="Modifier"
+                          >
+                            <EditIcon />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteClick(category)}
+                            className="rounded-lg p-2 text-black/60 transition hover:bg-red-50 hover:text-red-600"
+                            title="Supprimer"
+                          >
+                            <DeleteIcon />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -580,8 +591,8 @@ export default function CategoriesPage() {
         </div>
       </div>
 
-      {/* Modal d'ajout/modification (Utilise le composant extrait) */}
-      {isModalOpen && (
+      {/* Modal d'ajout/modification (Utilise le composant extrait) - Masqué pour les secrétaires */}
+      {!isReadOnly && isModalOpen && (
         <CategoryFormModal
           editingCategory={editingCategory}
           formData={formData}
@@ -591,20 +602,22 @@ export default function CategoriesPage() {
         />
       )}
 
-      {/* Modal de confirmation de suppression */}
-      <ConfirmModal
-        isOpen={deleteConfirm.isOpen}
-        title="Confirmer la suppression"
-        message={`Êtes-vous sûr de vouloir supprimer la catégorie "${deleteConfirm.category?.nom}" ? Cette action est irréversible.`}
-        confirmText="Supprimer"
-        cancelText="Annuler"
-        onConfirm={handleDeleteConfirm}
-        onCancel={handleDeleteCancel}
-        type="danger"
-      />
+      {/* Modal de confirmation de suppression - Masqué pour les secrétaires */}
+      {!isReadOnly && (
+        <ConfirmModal
+          isOpen={deleteConfirm.isOpen}
+          title="Confirmer la suppression"
+          message={`Êtes-vous sûr de vouloir supprimer la catégorie "${deleteConfirm.category?.nom}" ? Cette action est irréversible.`}
+          confirmText="Supprimer"
+          cancelText="Annuler"
+          onConfirm={handleDeleteConfirm}
+          onCancel={handleDeleteCancel}
+          type="danger"
+        />
+      )}
 
-      {/* Modal d'ajout/modification de sous-catégorie */}
-      {isSousCategorieModalOpen && selectedCategoryForSousCategorie && (
+      {/* Modal d'ajout/modification de sous-catégorie - Masqué pour les secrétaires */}
+      {!isReadOnly && isSousCategorieModalOpen && selectedCategoryForSousCategorie && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-3xl border border-black/10 bg-white p-8 shadow-2xl">
             <div className="mb-6 flex items-center justify-between">
@@ -674,13 +687,15 @@ export default function CategoriesPage() {
                 Sous-catégories de "{selectedCategoryForSousCategorie.nom}"
               </h2>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleOpenAddSousCategorieModal(selectedCategoryForSousCategorie)}
-                  className="rounded-lg p-2 cursor-pointer text-black/60 transition hover:bg-blue-50 hover:text-blue-600"
-                  title="Ajouter une sous-catégorie"
-                >
-                  <PlusIcon />
-                </button>
+                {!isReadOnly && (
+                  <button
+                    onClick={() => handleOpenAddSousCategorieModal(selectedCategoryForSousCategorie)}
+                    className="rounded-lg p-2 cursor-pointer text-black/60 transition hover:bg-blue-50 hover:text-blue-600"
+                    title="Ajouter une sous-catégorie"
+                  >
+                    <PlusIcon />
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     setIsViewSousCategoriesModalOpen(false);
@@ -722,20 +737,24 @@ export default function CategoriesPage() {
                         />
                         {sousCategorie.statut === "ACTIF" ? "Actif" : "Inactif"}
                       </span>
-                      <button
-                        onClick={() => handleEditSousCategorie(sousCategorie)}
-                        className="rounded-lg p-2 text-black/60 transition hover:bg-black/5 hover:text-black"
-                        title="Modifier"
-                      >
-                        <EditIcon />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteSousCategorieClick(sousCategorie)}
-                        className="rounded-lg p-2 text-black/60 transition hover:bg-red-50 hover:text-red-600"
-                        title="Supprimer"
-                      >
-                        <DeleteIcon />
-                      </button>
+                      {!isReadOnly && (
+                        <>
+                          <button
+                            onClick={() => handleEditSousCategorie(sousCategorie)}
+                            className="rounded-lg p-2 text-black/60 transition hover:bg-black/5 hover:text-black"
+                            title="Modifier"
+                          >
+                            <EditIcon />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteSousCategorieClick(sousCategorie)}
+                            className="rounded-lg p-2 text-black/60 transition hover:bg-red-50 hover:text-red-600"
+                            title="Supprimer"
+                          >
+                            <DeleteIcon />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -745,17 +764,19 @@ export default function CategoriesPage() {
         </div>
       )}
 
-      {/* Modal de confirmation de suppression de sous-catégorie */}
-      <ConfirmModal
-        isOpen={deleteSousCategorieConfirm.isOpen}
-        title="Confirmer la suppression"
-        message={`Êtes-vous sûr de vouloir supprimer la sous-catégorie "${deleteSousCategorieConfirm.sousCategorie?.nom}" ? Cette action est irréversible.`}
-        confirmText="Supprimer"
-        cancelText="Annuler"
-        onConfirm={handleDeleteSousCategorieConfirm}
-        onCancel={() => setDeleteSousCategorieConfirm({ isOpen: false, sousCategorie: null })}
-        type="danger"
-      />
+      {/* Modal de confirmation de suppression de sous-catégorie - Masqué pour les secrétaires */}
+      {!isReadOnly && (
+        <ConfirmModal
+          isOpen={deleteSousCategorieConfirm.isOpen}
+          title="Confirmer la suppression"
+          message={`Êtes-vous sûr de vouloir supprimer la sous-catégorie "${deleteSousCategorieConfirm.sousCategorie?.nom}" ? Cette action est irréversible.`}
+          confirmText="Supprimer"
+          cancelText="Annuler"
+          onConfirm={handleDeleteSousCategorieConfirm}
+          onCancel={() => setDeleteSousCategorieConfirm({ isOpen: false, sousCategorie: null })}
+          type="danger"
+        />
+      )}
     </div>
   );
 }

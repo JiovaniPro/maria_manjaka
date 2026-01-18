@@ -10,6 +10,8 @@ export type User = {
     id: number;
     email: string;
     nom: string;
+    role?: 'ADMIN' | 'SECRETAIRE';
+    compteSecretaireId?: number;
     createdAt: string;
     updatedAt: string;
 };
@@ -27,7 +29,7 @@ export type Categorie = {
 export type Compte = {
     id: number;
     nom: string;
-    type: 'CAISSE' | 'BANQUE';
+    type: 'CAISSE' | 'BANQUE' | 'SECRETAIRE';
     soldeActuel: number;
     createdAt?: string;
     updatedAt?: string;

@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/components/ToastContainer";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { useLoading } from "@/hooks/useLoading";
+import { useAuth } from "@/contexts/AuthContext";
 import { TransactionForm } from "@/components/TransactionForm";
 import { ConfirmModal } from "@/components/ConfirmModal";
 import { SecurityLockModal } from "@/components/SecurityLockModal";
@@ -143,9 +144,12 @@ export default function TransactionsPage() {
   const pathname = usePathname();
   const router = useRouter();
   const { showToast } = useToast();
+  const { user } = useAuth();
   const isLoading = useLoading(1200);
   const { adminPassword } = useAdminPassword();
   const { isLocked, recordFailedAttempt, resetFailedAttempts, remainingAttempts } = useSecurityLock();
+  
+  const isSecretaire = user?.role === 'SECRETAIRE';
 
   // --- VARIABLES D'ÉTAT POUR L'API
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -182,7 +186,7 @@ export default function TransactionsPage() {
     date: new Date().toISOString().substring(0, 10),
     description: "",
     montant: "",
-    type: "Revenu" as "Revenu" | "Dépense",
+    type: (user?.role === 'SECRETAIRE' ? "Dépense" : "Revenu") as "Revenu" | "Dépense",
     categorie: "",
     sousCategorie: [] as string[],
     compte: "",
@@ -275,12 +279,24 @@ export default function TransactionsPage() {
       const comptesRes = await api.get('/comptes');
       const comptesApi = comptesRes.data.data;
 
+      // Filtrer les comptes si l'utilisateur est secrétaire
+      let comptesFiltres = comptesApi;
+      const currentUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user') || '{}') : null;
+      if (currentUser?.role === 'SECRETAIRE' && currentUser?.compteSecretaireId) {
+        comptesFiltres = comptesApi.filter((c: any) => c.id === currentUser.compteSecretaireId);
+        // Sélectionner automatiquement le compte secrétaire
+        const compteSecretaire = comptesFiltres.find((c: any) => c.id === currentUser.compteSecretaireId);
+        if (compteSecretaire) {
+          setFormData(prev => ({ ...prev, compte: compteSecretaire.nom }));
+        }
+      }
+      
       // Map Accounts
-      setAccountsData(comptesApi);
+      setAccountsData(comptesFiltres);
       
       // Trouver les comptes par type (plus fiable que par nom)
-      const caisse = comptesApi.find((c: any) => c.type === 'CAISSE');
-      const banque = comptesApi.find((c: any) => c.type === 'BANQUE');
+      const caisse = comptesFiltres.find((c: any) => c.type === 'CAISSE');
+      const banque = comptesFiltres.find((c: any) => c.type === 'BANQUE');
 
       // Calculer les soldes totaux par type (au cas où il y aurait plusieurs comptes)
       const soldeCaisseTotal = comptesApi
@@ -508,16 +524,18 @@ export default function TransactionsPage() {
   }, [defaultCaisseName]);
 
   // Réinitialiser la catégorie si elle ne correspond plus au type de transaction
-  // Exception : Ne pas réinitialiser Fikambanana automatiquement, laisser l'utilisateur choisir
+  // Exception : Ne pas réinitialiser Fikambanana masina automatiquement, laisser l'utilisateur choisir
+  // Fikambanana masina peut être utilisée pour les deux types (RECETTE et DEPENSE)
   // La validation se fera lors de la soumission
   useEffect(() => {
     if (formData.categorie) {
       const selectedCategory = categoriesData.find(c => c.nom === formData.categorie);
       if (selectedCategory) {
-        const isFikambanana = selectedCategory.nom.toLowerCase().includes("fikambanana");
-        // Ne pas réinitialiser Fikambanana automatiquement
+        const isFikambananaMasina = selectedCategory.nom.toLowerCase().includes("fikambanana") && 
+                                     selectedCategory.nom.toLowerCase().includes("masina");
+        // Ne pas réinitialiser Fikambanana masina automatiquement (peut être utilisée pour les deux types)
         // Pour les autres catégories, réinitialiser si le type ne correspond pas
-        if (!isFikambanana && selectedCategory.type !== formData.type) {
+        if (!isFikambananaMasina && selectedCategory.type !== formData.type) {
           setFormData(prev => ({
             ...prev,
             categorie: "", // Réinitialiser si le type ne correspond pas
@@ -629,19 +647,39 @@ export default function TransactionsPage() {
   );
 
   const availableCategories = useMemo(() => {
+    // Si l'utilisateur est secrétaire, ne montrer que les catégories de dépenses
+    const typeFilter = isSecretaire ? "Dépense" : formData.type;
+    
     const filtered = categoriesData.filter(
       (cat) => {
         if (cat.statut !== "actif") return false;
         
-        // Pour Fikambanana, afficher toutes les catégories Fikambanana (peu importe le type)
-        // car il peut y avoir deux catégories distinctes (une pour RECETTE, une pour DEPENSE)
+        // Pour Fikambanana masina, afficher la catégorie pour les deux types (RECETTE et DEPENSE)
+        // Une seule catégorie Fikambanana masina peut être utilisée pour les deux types
+        const isFikambananaMasina = cat.nom.toLowerCase().includes("fikambanana") && 
+                                    cat.nom.toLowerCase().includes("masina");
+        
+        if (isFikambananaMasina) {
+          // Si secrétaire, ne garder que les catégories Fikambanana masina de type Dépense
+          if (isSecretaire) {
+            return cat.type === "Dépense";
+          }
+          // Pour les admins, afficher Fikambanana masina pour les deux types
+          return true;
+        }
+        
+        // Pour les autres catégories Fikambanana (sans "masina"), suivre la règle normale
         const isFikambanana = cat.nom.toLowerCase().includes("fikambanana");
         if (isFikambanana) {
+          // Si secrétaire, ne garder que les catégories Fikambanana de type Dépense
+          if (isSecretaire) {
+            return cat.type === "Dépense";
+          }
           return true;
         }
         
         // Pour les autres catégories, vérifier que le type correspond
-        return cat.type === formData.type;
+        return cat.type === typeFilter;
       }
     );
     // Éviter les doublons en utilisant un Set basé sur l'ID (pas le nom, car Fikambanana peut avoir plusieurs catégories avec des noms similaires)
@@ -794,11 +832,19 @@ export default function TransactionsPage() {
   const handleModifyTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Recalculer le montant pour être sûr d'avoir la valeur la plus récente
+    const montantParsed = parseFloat(formData.montant.toString().replace(/\s/g, '').replace(/,/g, '')) || 0;
+
     if (showNumeroCheque && !formData.numeroCheque) {
       showToast(
         "Le numéro de chèque est obligatoire pour un paiement par banque",
         "warning"
       );
+      return;
+    }
+
+    if (montantParsed <= 0) {
+      showToast("Le montant doit être supérieur à zéro", "warning");
       return;
     }
 
@@ -810,31 +856,33 @@ export default function TransactionsPage() {
     // Vérification des soldes lors de la modification
     // Si c'est une modification, on doit tenir compte de l'ancien montant qui sera remboursé
     if (formData.type === "Dépense" && isCaisseSelected) {
-      let soldeEffectifCaisse = soldeCaisse;
+      const soldeCaisseNum = typeof soldeCaisse === 'number' ? soldeCaisse : parseFloat(soldeCaisse.toString()) || 0;
+      let soldeEffectifCaisse = soldeCaisseNum;
       
       // Si c'est une modification d'une dépense, l'ancien montant sera remboursé à la caisse
       if (selectedTransactionToModify && selectedTransactionToModify.type === "Dépense") {
         const ancienMontant = Math.abs(parseFloat(selectedTransactionToModify.montant.toString()));
-        soldeEffectifCaisse = soldeCaisse + ancienMontant;
+        soldeEffectifCaisse = soldeCaisseNum + ancienMontant;
       }
       
-      if (montantNumber > soldeEffectifCaisse) {
-        showToast("Montant supérieur au solde disponible en caisse.", "warning");
+      if (montantParsed > soldeEffectifCaisse) {
+        showToast(`Montant supérieur au solde disponible en caisse. Solde: ${formatCurrency(soldeEffectifCaisse)}, Montant: ${formatCurrency(montantParsed)}`, "warning");
         return;
       }
     }
 
     if (formData.type === "Dépense" && isBanqueSelected) {
-      let soldeEffectifBanque = soldeBanque;
+      const soldeBanqueNum = typeof soldeBanque === 'number' ? soldeBanque : parseFloat(soldeBanque.toString()) || 0;
+      let soldeEffectifBanque = soldeBanqueNum;
       
       // Si c'est une modification d'une dépense bancaire, l'ancien montant sera remboursé à la banque
       if (selectedTransactionToModify && selectedTransactionToModify.type === "Dépense") {
         const ancienMontant = Math.abs(parseFloat(selectedTransactionToModify.montant.toString()));
-        soldeEffectifBanque = soldeBanque + ancienMontant;
+        soldeEffectifBanque = soldeBanqueNum + ancienMontant;
       }
       
-      if (montantNumber > soldeEffectifBanque) {
-        showToast("Montant supérieur au solde disponible en banque.", "warning");
+      if (montantParsed > soldeEffectifBanque) {
+        showToast(`Montant supérieur au solde disponible en banque. Solde: ${formatCurrency(soldeEffectifBanque)}, Montant: ${formatCurrency(montantParsed)}`, "warning");
         return;
       }
     }
@@ -860,9 +908,13 @@ export default function TransactionsPage() {
       }
 
       // Vérifier que le type de catégorie correspond au type de transaction
-      // Même pour Fikambanana, il y a deux catégories distinctes (une pour RECETTE, une pour DEPENSE)
-      // Le type de catégorie doit donc correspondre au type de transaction
-      if (cat.type !== formData.type) {
+      // Exception : Fikambanana masina peut être utilisée pour les deux types (RECETTE et DEPENSE)
+      // Une seule catégorie Fikambanana masina peut accepter les deux types de transactions
+      const isFikambananaMasina = cat.nom.toLowerCase().includes("fikambanana") && 
+                                   cat.nom.toLowerCase().includes("masina");
+      
+      // Pour les autres catégories, vérifier que le type correspond
+      if (!isFikambananaMasina && cat.type !== formData.type) {
         showToast(
           `Le type de catégorie (${cat.type}) ne correspond pas au type de transaction (${formData.type}). Veuillez sélectionner la catégorie appropriée.`,
           "error"
@@ -931,7 +983,7 @@ export default function TransactionsPage() {
         compteId: acc.id,
         dateTransaction: formData.date,
         description: descriptionWithSousCategories || null,
-        montant: parseFloat(formData.montant.toString().replace(/\s/g, '')),
+        montant: montantParsed,
         type: formData.type === 'Revenu' ? 'RECETTE' : 'DEPENSE'
       });
 
@@ -1021,6 +1073,9 @@ export default function TransactionsPage() {
   const handleAddTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Recalculer le montant pour être sûr d'avoir la valeur la plus récente
+    const montantParsed = parseFloat(formData.montant.toString().replace(/\s/g, '').replace(/,/g, '')) || 0;
+
     if (showNumeroCheque && !formData.numeroCheque) {
       showToast(
         "Le numéro de chèque est obligatoire pour un paiement par banque",
@@ -1029,7 +1084,7 @@ export default function TransactionsPage() {
       return;
     }
 
-    if (montantNumber <= 0) {
+    if (montantParsed <= 0) {
       showToast("Le montant doit être supérieur à zéro", "warning");
       return;
     }
@@ -1039,14 +1094,23 @@ export default function TransactionsPage() {
       return;
     }
 
-    if (formData.type === "Dépense" && isCaisseSelected && montantNumber > soldeCaisse) {
-      showToast("Montant supérieur au solde disponible en caisse.", "warning");
-      return;
+    // Vérifier le solde avec le montant parsé correctement
+    if (formData.type === "Dépense" && isCaisseSelected) {
+      // S'assurer que soldeCaisse est un nombre
+      const soldeCaisseNum = typeof soldeCaisse === 'number' ? soldeCaisse : parseFloat(soldeCaisse.toString()) || 0;
+      if (montantParsed > soldeCaisseNum) {
+        showToast(`Montant supérieur au solde disponible en caisse. Solde: ${formatCurrency(soldeCaisseNum)}, Montant: ${formatCurrency(montantParsed)}`, "warning");
+        return;
+      }
     }
 
-    if (formData.type === "Dépense" && isBanqueSelected && montantNumber > soldeBanque) {
-      showToast("Montant supérieur au solde disponible en banque.", "warning");
-      return;
+    if (formData.type === "Dépense" && isBanqueSelected) {
+      // S'assurer que soldeBanque est un nombre
+      const soldeBanqueNum = typeof soldeBanque === 'number' ? soldeBanque : parseFloat(soldeBanque.toString()) || 0;
+      if (montantParsed > soldeBanqueNum) {
+        showToast(`Montant supérieur au solde disponible en banque. Solde: ${formatCurrency(soldeBanqueNum)}, Montant: ${formatCurrency(montantParsed)}`, "warning");
+        return;
+      }
     }
 
     if (formData.type === "Dépense" && isBanqueSelected) {
@@ -1081,9 +1145,13 @@ export default function TransactionsPage() {
       }
 
       // Vérifier que le type de catégorie correspond au type de transaction
-      // Même pour Fikambanana, il y a deux catégories distinctes (une pour RECETTE, une pour DEPENSE)
-      // Le type de catégorie doit donc correspondre au type de transaction
-      if (cat.type !== formData.type) {
+      // Exception : Fikambanana masina peut être utilisée pour les deux types (RECETTE et DEPENSE)
+      // Une seule catégorie Fikambanana masina peut accepter les deux types de transactions
+      const isFikambananaMasina = cat.nom.toLowerCase().includes("fikambanana") && 
+                                   cat.nom.toLowerCase().includes("masina");
+      
+      // Pour les autres catégories, vérifier que le type correspond
+      if (!isFikambananaMasina && cat.type !== formData.type) {
         showToast(
           `Le type de catégorie (${cat.type}) ne correspond pas au type de transaction (${formData.type}). Veuillez sélectionner la catégorie appropriée.`,
           "error"
@@ -1116,7 +1184,7 @@ export default function TransactionsPage() {
           compteId: acc.id,
           dateOperation: formData.date,
           description: formData.description,
-          montant: parseFloat(formData.montant.toString().replace(/\s/g, '')),
+          montant: montantParsed,
           type: 'RETRAIT',
           numeroCheque: formData.numeroCheque
         });
@@ -1179,7 +1247,7 @@ export default function TransactionsPage() {
         compteId: targetCompteId,
         dateTransaction: formData.date,
         description: descriptionWithSousCategories || null,
-        montant: parseFloat(formData.montant.toString().replace(/\s/g, '')),
+        montant: montantParsed,
         type: formData.type === 'Revenu' ? 'RECETTE' : 'DEPENSE'
       });
 
@@ -1615,6 +1683,7 @@ export default function TransactionsPage() {
           chequeExists={isChequeExists}
           chequeChecking={isChequeChecking}
           submitDisabled={submitDisabledByCheque}
+          disableTypeChange={isSecretaire}
         />
       )}
 
@@ -1676,6 +1745,7 @@ export default function TransactionsPage() {
           lockCompte={formData.type === "Revenu"}
           showFacturePrompt={requiresFacture}
           needsAdminPassword={needsAdminPassword}
+          disableTypeChange={isSecretaire}
         />
       )}
 
