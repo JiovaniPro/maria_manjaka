@@ -13,6 +13,7 @@ import {
     LogoutIcon,
     IconChurch,
     AssociationIcon,
+    ReportsIcon,
 } from "@/components/Icons";
 
 type NavItem = { label: string; icon: any; href: string };
@@ -24,6 +25,7 @@ const navItems: NavItem[] = [
     { label: "Catégories", icon: CategoriesIcon, href: "/categorie" },
     { label: "Association", icon: AssociationIcon, href: "/association" },
     { label: "Transaction Bancaire", icon: UsersIcon, href: "/banque" },
+    { label: "Récapitulation", icon: ReportsIcon, href: "/recapitulation" },
 ];
 
 const preferenceItems: PreferenceItem[] = [
